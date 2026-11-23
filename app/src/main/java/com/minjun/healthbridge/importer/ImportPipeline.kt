@@ -26,6 +26,10 @@ data class ImportReport(
     val failed: Int,
     /** false: 이미 옮긴 운동을 확인하지 못해 전부 새로 썼음 (같은 ID라 중복은 없음) */
     val existingChecked: Boolean = true,
+    /** 실제로 쓴 기록 수, 종류(Health Connect 클래스 이름)별 */
+    val recordCounts: Map<String, Int> = emptyMap(),
+    /** zip 안에서 실제로 읽은 파일 수 (XML 1 + 경로 파일) */
+    val filesUsed: Int = 0,
 )
 
 class ImportPipeline(
@@ -47,11 +51,16 @@ class ImportPipeline(
     suspend fun run(options: ImportOptions, onProgress: suspend (ImportProgress) -> Unit): ImportReport {
         var written = 0
         var failed = 0
+        var routeFilesRead = 0
+        val kinds = HashMap<String, Int>()
         suspend fun flush(records: List<Record>) {
             if (records.isEmpty()) return
             val r = writer.write(records)
             written += r.written
             failed += r.failed
+            val k = if (r.writtenKinds.isNotEmpty()) r.writtenKinds
+            else if (r.failed == 0) BatchingWriter.kindsOf(records) else emptyMap()
+            k.forEach { (name, n) -> kinds.merge(name, n, Int::plus) }
         }
 
         fun <R : Record> safe(build: () -> List<R>): List<R> = runCatching(build).getOrElse { failed += 1; emptyList() }
@@ -59,7 +68,8 @@ class ImportPipeline(
         onProgress(ImportProgress("운동 찾는 중", 0, 0))
         val inRange = reader.readWorkouts(options.watchOnly).filter {
             (options.from == null || !it.end.instant.isBefore(options.from)) &&
-                (options.to == null || !it.start.instant.isAfter(options.to))
+                (options.to == null || !it.start.instant.isAfter(options.to)) &&
+                (options.workoutTypes == null || it.activityType in options.workoutTypes)
         }
         val knownOrNull = existingIds()
         val known = knownOrNull.orEmpty()
@@ -132,6 +142,7 @@ class ImportPipeline(
             val collected = HashMap<AppleWorkout, MutableList<RoutePoint>>()
             withRoutes.forEach { w -> w.routePaths.forEach { owner[it] = w }; left[w] = w.routePaths.toSet().size }
             reader.forEachRoute(owner.keys) { path, points ->
+                routeFilesRead++
                 val w = owner[path] ?: return@forEachRoute
                 collected.getOrPut(w) { ArrayList() } += points
                 val n = (left[w] ?: 1) - 1
@@ -154,6 +165,8 @@ class ImportPipeline(
             recordsWritten = written,
             failed = failed,
             existingChecked = knownOrNull != null,
+            recordCounts = kinds,
+            filesUsed = 1 + routeFilesRead,
         )
     }
 

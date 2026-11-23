@@ -47,8 +47,24 @@ data class ImportOptions(
     val restingHrAndWeight: Boolean = false,
     val stepsAndSleep: Boolean = false,
     val watchOnly: Boolean = true,
+    /** 옮길 운동 종류 (HKWorkoutActivityType*). null = 전부 */
+    val workoutTypes: Set<String>? = null,
     /** 이미 옮긴 운동도 다시 써서 빠진 심박·경로·칼로리를 채운다 (같은 ID라 중복 없음) */
     val rewriteExisting: Boolean = false,
     val from: Instant? = null,
     val to: Instant? = null,
+)
+
+/** 미리보기용: 파일 안에 항목별로 몇 개 들어있는지 */
+data class ScanSummary(
+    val workoutCount: Int,
+    val workoutTypes: Map<String, Int>,
+    val heartRate: Int,
+    val restingHeartRate: Int,
+    val weight: Int,
+    val steps: Int,
+    val sleep: Int,
+    val routeCount: Int,
+    val firstDate: java.time.Instant?,
+    val lastDate: java.time.Instant?,
 )

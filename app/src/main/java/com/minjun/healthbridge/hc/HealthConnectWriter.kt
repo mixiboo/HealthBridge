@@ -12,7 +12,8 @@ interface RecordWriter {
     suspend fun write(records: List<Record>): WriteResult
 }
 
-data class WriteResult(val written: Int, val failed: Int)
+/** writtenKinds: 실제로 쓴 기록 수를 종류(클래스 이름)별로. 비어 있으면 호출한 쪽이 계산 */
+data class WriteResult(val written: Int, val failed: Int, val writtenKinds: Map<String, Int> = emptyMap())
 
 /** Health Connect 쓰기: 크기 기준으로 묶고, 실패하면 반으로 나눠 문제 기록만 걸러낸다 (BatchingWriter) */
 class HealthConnectWriter(private val client: HealthConnectClient) : RecordWriter {

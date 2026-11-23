@@ -28,6 +28,9 @@ class AppleExportReader(
     fun readWorkouts(watchOnly: Boolean): List<AppleWorkout> =
         withHealthXml { xml.readWorkouts(it, watchOnly) }
 
+    fun scan(watchOnly: Boolean): com.minjun.healthbridge.model.ScanSummary =
+        withHealthXml { xml.scan(it, watchOnly) }
+
     fun readRecords(options: ImportOptions, workouts: List<AppleWorkout>, sink: RecordSink) =
         withHealthXml { xml.readRecords(it, options, workouts, sink) }
 

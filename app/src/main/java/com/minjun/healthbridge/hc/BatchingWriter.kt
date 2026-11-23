@@ -29,11 +29,13 @@ class BatchingWriter(
     override suspend fun write(records: List<Record>): WriteResult {
         var ok = 0
         var bad = 0
+        val kinds = HashMap<String, Int>()
         for (batch in pack(records)) {
             val r = writeSplitting(batch)
             ok += r.written; bad += r.failed
+            r.writtenKinds.forEach { (k, v) -> kinds.merge(k, v, Int::plus) }
         }
-        return WriteResult(ok, bad)
+        return WriteResult(ok, bad, kinds)
     }
 
     private fun pack(records: List<Record>): List<List<Record>> {
@@ -52,19 +54,20 @@ class BatchingWriter(
     }
 
     private suspend fun writeSplitting(batch: List<Record>): WriteResult {
-        if (runCatching { insert(batch) }.isSuccess) return WriteResult(batch.size, 0)
+        if (runCatching { insert(batch) }.isSuccess) return WriteResult(batch.size, 0, kindsOf(batch))
         if (batch.size == 1) {
             // 일시적인 제한(쿼터 등)일 수 있어 잠깐 쉬고 한 번 더
             if (retryDelayMs > 0) delay(retryDelayMs)
-            return if (runCatching { insert(batch) }.isSuccess) WriteResult(1, 0) else WriteResult(0, 1)
+            return if (runCatching { insert(batch) }.isSuccess) WriteResult(1, 0, kindsOf(batch)) else WriteResult(0, 1)
         }
         val mid = batch.size / 2
         val a = writeSplitting(batch.subList(0, mid))
         val b = writeSplitting(batch.subList(mid, batch.size))
-        return WriteResult(a.written + b.written, a.failed + b.failed)
+        return WriteResult(a.written + b.written, a.failed + b.failed, (a.writtenKinds.keys + b.writtenKinds.keys).associateWith { (a.writtenKinds[it] ?: 0) + (b.writtenKinds[it] ?: 0) })
     }
 
     companion object {
+        fun kindsOf(records: List<Record>): Map<String, Int> = records.groupingBy { it::class.java.simpleName }.eachCount()
         const val MAX_BATCH_BYTES = 1_000_000
         const val MAX_BATCH_COUNT = 500
     }

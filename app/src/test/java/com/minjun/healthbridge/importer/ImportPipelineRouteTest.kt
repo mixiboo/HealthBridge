@@ -53,4 +53,9 @@ class ImportPipelineRouteTest {
         val run = sessions.single { it.exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_RUNNING }
         assertEquals(ExerciseRouteResult.NoData::class, run.exerciseRouteResult::class)
     }
+
+    @Test fun files_used_counts_xml_and_route_files_read() = runTest {
+        val r = ImportPipeline(AppleExportReader({ zip.inputStream() }) { KXmlParser() }, Collect()) { emptySet() }.run(ImportOptions()) {}
+        assertEquals(3, r.filesUsed) // XML 1 + a.gpx + b.gpx (missing.gpx는 없음)
+    }
 }

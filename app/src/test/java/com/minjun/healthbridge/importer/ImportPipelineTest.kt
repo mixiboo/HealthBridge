@@ -87,6 +87,20 @@ class ImportPipelineTest {
         assertEquals(true, ok.existingChecked)
     }
 
+    @Test fun workout_type_filter() = runTest {
+        val w = FakeWriter()
+        val r = ImportPipeline(reader, w) { emptySet() }.run(ImportOptions(workoutTypes = setOf("HKWorkoutActivityTypeRunning"))) {}
+        assertEquals(1, r.newWorkouts)
+        assertEquals(listOf(ExerciseSessionRecord.EXERCISE_TYPE_RUNNING), w.written.filterIsInstance<ExerciseSessionRecord>().map { it.exerciseType })
+    }
+
+    @Test fun report_counts_records_by_kind() = runTest {
+        val r = ImportPipeline(reader, FakeWriter()) { emptySet() }.run(ImportOptions()) {}
+        assertEquals(4, r.recordCounts["ExerciseSessionRecord"])
+        assertEquals(1, r.recordCounts["HeartRateRecord"])
+        assertEquals(r.recordsWritten, r.recordCounts.values.sum())
+    }
+
     @Test fun progress_reaches_total() = runTest {
         val seen = ArrayList<ImportProgress>()
         ImportPipeline(reader, FakeWriter()) { emptySet() }.run(ImportOptions()) { seen += it }
