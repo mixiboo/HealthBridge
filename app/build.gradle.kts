@@ -40,7 +40,12 @@ android {
             if (System.getenv("HB_KEYSTORE_PATH") != null) signingConfig = signingConfigs.getByName("release")
         }
     }
-    testOptions { unitTests.isReturnDefaultValues = true; unitTests.isIncludeAndroidResources = true }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
+        // Robolectric이 실행 중에 받는 android-all도 미러에서
+        unitTests.all { it.systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2/") }
+    }
 }
 
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
