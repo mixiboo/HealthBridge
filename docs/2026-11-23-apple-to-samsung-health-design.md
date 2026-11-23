@@ -84,5 +84,5 @@
 ## 9. 실험 결과 (Task 0, 2026-11-23, Galaxy S25+)
 - ✅ 운동 목록에 "달리기"로 표시, 거리 5.00 km, 운동 시간 30:00
 - ✅ 운동 중 심박: 평균 139 / 최대 160 bpm, 상세 화면에 심박 차트 표시 → 같은 시간대 HeartRateRecord 방식이 동작함
-- ❓ 경로 지도: 상세 화면 상단에 지도 대신 기본 이미지가 표시됨 (추가 확인 중)
-- ❓ 칼로리: 첫 화면에는 안 보임 (아래쪽 확인 중)
+- ❌ 경로 지도: Samsung Health가 Health Connect 경로를 지도로 표시하지 않음 (데이터는 Health Connect에 저장됨)
+- ❌→✅ 칼로리: ActiveCaloriesBurned만으로는 안 보임. v0.3에서 TotalCaloriesBurned도 쓰자 "운동 칼로리 250 kcal / 총 칼로리 250 kcal" 표시 확인
