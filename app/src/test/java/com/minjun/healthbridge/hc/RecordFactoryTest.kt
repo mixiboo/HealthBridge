@@ -155,6 +155,15 @@ class RecordFactoryTest {
         assertEquals(a.map { it.metadata.clientRecordId }, RecordFactory.allDayHeart(samples).map { it.metadata.clientRecordId })
     }
 
+    @Test fun all_day_heart_grouped_by_hour() {
+        val base = t("2025-01-02 12:00:00 +0900")
+        val samples = (0 until 36).map { HeartSample(AppleTime(base.instant.plusSeconds(it * 600L), base.offset), 70) } // 6시간, 10분 간격
+        val recs = RecordFactory.allDayHeart(samples)
+        assertEquals(6, recs.size)
+        val firstHourOnly = RecordFactory.allDayHeart(samples.take(6))
+        assertEquals(recs.first().metadata.clientRecordId, firstHourOnly.single().metadata.clientRecordId)
+    }
+
     @Test fun quantity_types() {
         val s = t("2025-01-03 08:00:00 +0900"); val e = t("2025-01-03 08:05:00 +0900")
         val rhr = RecordFactory.quantity(QuantitySample("HKQuantityTypeIdentifierRestingHeartRate", s, e, 58.0, "count/min", true))

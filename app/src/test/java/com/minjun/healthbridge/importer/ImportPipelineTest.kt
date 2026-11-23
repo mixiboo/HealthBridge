@@ -55,6 +55,30 @@ class ImportPipelineTest {
         assertTrue(second.written.none { it is ExerciseSessionRecord })
     }
 
+    @Test fun rewrite_existing_refills_known_workouts() = runTest {
+        val first = FakeWriter()
+        ImportPipeline(reader, first) { emptySet() }.run(ImportOptions(workoutHeartRate = false, routes = false)) {}
+        val ids = first.written.filterIsInstance<ExerciseSessionRecord>().map { it.metadata.clientRecordId!! }.toSet()
+        val second = FakeWriter()
+        val report = ImportPipeline(reader, second) { ids }.run(ImportOptions(rewriteExisting = true)) {}
+        assertEquals(0, report.newWorkouts)
+        assertEquals(4, report.alreadyThere)
+        assertEquals(ids, second.written.filterIsInstance<ExerciseSessionRecord>().map { it.metadata.clientRecordId!! }.toSet())
+        assertEquals(1, second.written.filterIsInstance<HeartRateRecord>().size)
+    }
+
+    @Test fun all_day_heart_ids_stable_across_date_ranges() = runTest {
+        fun idsFor(o: ImportOptions): Map<Long, String> {
+            val w = FakeWriter()
+            kotlinx.coroutines.runBlocking { ImportPipeline(reader, w) { emptySet() }.run(o) {} }
+            return w.written.filterIsInstance<HeartRateRecord>()
+                .flatMap { r -> r.samples.map { it.beatsPerMinute to r.metadata.clientRecordId!! } }.toMap()
+        }
+        val all = idsFor(ImportOptions(allDayHeartRate = true, workoutHeartRate = false))
+        val recent = idsFor(ImportOptions(allDayHeartRate = true, workoutHeartRate = false, from = Instant.parse("2025-01-01T00:00:00Z")))
+        assertEquals(all.getValue(70L), recent.getValue(70L))
+    }
+
     @Test fun progress_reaches_total() = runTest {
         val seen = ArrayList<ImportProgress>()
         ImportPipeline(reader, FakeWriter()) { emptySet() }.run(ImportOptions()) { seen += it }

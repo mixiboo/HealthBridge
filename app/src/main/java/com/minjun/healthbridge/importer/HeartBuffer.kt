@@ -23,6 +23,25 @@ class HeartBuffer {
         size++
     }
 
+    /** 시간순으로 정렬해 1시간 단위 묶음으로 넘긴다 (전체를 객체로 만들지 않음) */
+    fun forEachHour(block: (List<HeartSample>) -> Unit) {
+        if (size == 0) return
+        // (시각 << 22 | 위치)를 정렬해 원시 배열만으로 순서를 구한다. 시각(ms) < 2^41, 위치 < 2^22
+        require(size < (1 shl 22)) { "too many samples" }
+        val keys = LongArray(size) { (times[it] shl 22) or it.toLong() }
+        keys.sort()
+        var cur = ArrayList<HeartSample>()
+        var curHour = Long.MIN_VALUE
+        for (k in keys) {
+            val i = (k and ((1L shl 22) - 1)).toInt()
+            val hour = Math.floorDiv(times[i], 3_600_000L)
+            if (hour != curHour && cur.isNotEmpty()) { block(cur); cur = ArrayList() }
+            curHour = hour
+            cur += HeartSample(AppleTime(Instant.ofEpochMilli(times[i]), ZoneOffset.ofTotalSeconds(offsets[i])), bpms[i].toLong())
+        }
+        if (cur.isNotEmpty()) block(cur)
+    }
+
     fun toSamples(): List<HeartSample> = List(size) {
         HeartSample(AppleTime(Instant.ofEpochMilli(times[it]), ZoneOffset.ofTotalSeconds(offsets[it])), bpms[it].toLong())
     }

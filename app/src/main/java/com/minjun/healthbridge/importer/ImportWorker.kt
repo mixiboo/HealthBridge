@@ -97,7 +97,7 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             KEY_URI to uri.toString(),
             "workouts" to o.workouts, "workoutHeartRate" to o.workoutHeartRate, "routes" to o.routes,
             "allDayHeartRate" to o.allDayHeartRate, "restingHrAndWeight" to o.restingHrAndWeight,
-            "stepsAndSleep" to o.stepsAndSleep, "watchOnly" to o.watchOnly,
+            "stepsAndSleep" to o.stepsAndSleep, "watchOnly" to o.watchOnly, "rewriteExisting" to o.rewriteExisting,
             "from" to (o.from?.toEpochMilli() ?: -1L), "to" to (o.to?.toEpochMilli() ?: -1L),
         )
 
@@ -109,6 +109,7 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             restingHrAndWeight = d.getBoolean("restingHrAndWeight", false),
             stepsAndSleep = d.getBoolean("stepsAndSleep", false),
             watchOnly = d.getBoolean("watchOnly", true),
+            rewriteExisting = d.getBoolean("rewriteExisting", false),
             from = d.getLong("from", -1).takeIf { it >= 0 }?.let(Instant::ofEpochMilli),
             to = d.getLong("to", -1).takeIf { it >= 0 }?.let(Instant::ofEpochMilli),
         )

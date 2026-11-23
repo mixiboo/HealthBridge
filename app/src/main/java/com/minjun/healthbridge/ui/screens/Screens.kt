@@ -104,6 +104,7 @@ fun PreviewScreen(preview: ImportPreview, options: ImportOptions, onChange: (Imp
     if (options.stepsAndSleep) {
         Text("⚠️ 갤럭시워치와 같이 차면 걸음 수·수면이 두 번 기록될 수 있어요.", color = MaterialTheme.colorScheme.error)
     }
+    Check("이미 옮긴 운동도 다시 쓰기 (빠진 심박·경로 채우기)", options.rewriteExisting) { onChange(options.copy(rewriteExisting = it)) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("애플워치 기록만", Modifier.weight(1f))
         Switch(checked = options.watchOnly, onCheckedChange = { onChange(options.copy(watchOnly = it)) })
@@ -138,9 +139,9 @@ fun DoneScreen(r: ImportReport, onOpenSamsungHealth: () -> Unit, onAgain: () -> 
     Text("다 옮겼어요! 🎉", style = MaterialTheme.typography.headlineSmall)
     Card { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("새로 추가한 운동 ${r.newWorkouts}개")
-        Text("이미 있던 운동 ${r.alreadyThere}개 (건너뜀)")
+        Text("이미 있던 운동 ${r.alreadyThere}개")
         Text("Health Connect에 쓴 기록 ${r.recordsWritten}개")
-        if (r.failed > 0) Text("실패 ${r.failed}개 😢 다시 시도하면 빠진 것만 채워져요", color = MaterialTheme.colorScheme.error)
+        if (r.failed > 0) Text("실패 ${r.failed}개 😢 '이미 옮긴 운동도 다시 쓰기'를 켜고 한 번 더 하면 빠진 걸 채울 수 있어요", color = MaterialTheme.colorScheme.error)
     } }
     Text("Samsung Health에 뜨기까지 몇 분 걸릴 수 있어요.")
     Button(onClick = onOpenSamsungHealth, modifier = Modifier.fillMaxWidth()) { Text("Samsung Health 열기 💚") }

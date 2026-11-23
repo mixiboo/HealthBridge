@@ -31,8 +31,8 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
         while (event != XmlPullParser.END_DOCUMENT) {
             if (event == XmlPullParser.START_TAG && p.depth == 2) {
                 if (p.name == "Workout") {
-                    val w = readWorkout(p)
-                    if (!watchOnly || w.isFromWatch) out += w
+                    val w = readWorkout(p) // 날짜가 없거나 깨진 운동은 null → 건너뜀
+                    if (w != null && (!watchOnly || w.isFromWatch)) out += w
                 } else {
                     skip(p)
                 }
@@ -88,8 +88,8 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
         val source = p.attr("sourceName")
         val fromWatch = isWatch(source, p.attr("device"))
         if (options.watchOnly && !fromWatch && type != BODY_MASS) return
-        val start = p.attr("startDate")?.let(AppleDates::parse) ?: return
-        val end = p.attr("endDate")?.let(AppleDates::parse) ?: return
+        val start = p.attr("startDate")?.let { runCatching { AppleDates.parse(it) }.getOrNull() } ?: return
+        val end = p.attr("endDate")?.let { runCatching { AppleDates.parse(it) }.getOrNull() } ?: return
         if (options.from != null && end.instant < options.from) return
         if (options.to != null && start.instant > options.to) return
         val value = p.attr("value") ?: return
@@ -117,12 +117,12 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
         setInput(input, "UTF-8")
     }
 
-    private fun readWorkout(p: XmlPullParser): AppleWorkout {
+    private fun readWorkout(p: XmlPullParser): AppleWorkout? {
         val type = p.attr("workoutActivityType") ?: ""
         val source = p.attr("sourceName") ?: ""
         val device = p.attr("device")
-        val start = AppleDates.parse(p.attr("startDate")!!)
-        val end = AppleDates.parse(p.attr("endDate")!!)
+        val start = p.attr("startDate")?.let { runCatching { AppleDates.parse(it) }.getOrNull() }
+        val end = p.attr("endDate")?.let { runCatching { AppleDates.parse(it) }.getOrNull() }
         var kcal = energyToKcal(p.attr("totalEnergyBurned"), p.attr("totalEnergyBurnedUnit"))
         var meters = distanceToMeters(p.attr("totalDistance"), p.attr("totalDistanceUnit"))
         var indoor: Boolean? = null
@@ -150,6 +150,7 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
             }
             event = p.next()
         }
+        if (start == null || end == null) return null
         return AppleWorkout(
             activityType = type,
             start = start,

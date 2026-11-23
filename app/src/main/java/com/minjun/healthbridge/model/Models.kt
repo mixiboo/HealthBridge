@@ -41,6 +41,8 @@ data class ImportOptions(
     val restingHrAndWeight: Boolean = false,
     val stepsAndSleep: Boolean = false,
     val watchOnly: Boolean = true,
+    /** 이미 옮긴 운동도 다시 써서 빠진 심박·경로·칼로리를 채운다 (같은 ID라 중복 없음) */
+    val rewriteExisting: Boolean = false,
     val from: Instant? = null,
     val to: Instant? = null,
 )

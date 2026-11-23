@@ -24,6 +24,7 @@ import com.minjun.healthbridge.model.QuantitySample
 import com.minjun.healthbridge.model.RoutePoint
 import com.minjun.healthbridge.model.SleepSample
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import kotlin.math.roundToLong
 
 /** 애플 데이터 → Health Connect 기록. 모든 기록에 고정 clientRecordId를 붙인다. */
@@ -90,7 +91,24 @@ object RecordFactory {
         return (0 until MAX_ROUTE_POINTS).map { points[Math.round(it * step).toInt()] }
     }
 
-    fun allDayHeart(samples: List<HeartSample>): List<HeartRateRecord> = heartChunks(samples, "dayheart", "allday", true)
+    /**
+     * 하루 심박은 1시간 단위로 묶고, ID는 그 시간대(+순번)로 만든다.
+     * → 기간을 바꾸거나 새 내보내기로 다시 가져와도 같은 시간대는 같은 ID라 덮어쓰기만 된다.
+     */
+    fun allDayHeart(samples: List<HeartSample>): List<HeartRateRecord> {
+        val byHour = samples.distinctBy { it.time.instant }.groupBy { it.time.instant.truncatedTo(ChronoUnit.HOURS) }
+        return byHour.toSortedMap().flatMap { (hour, inHour) ->
+            inHour.sortedBy { it.time.instant }.chunked(MAX_HEART_SAMPLES).mapIndexed { idx, chunk ->
+                val s = chunk.first().time
+                HeartRateRecord(
+                    startTime = s.instant, startZoneOffset = s.offset,
+                    endTime = chunk.last().time.instant.plusMillis(1), endZoneOffset = chunk.last().time.offset,
+                    samples = chunk.map { HeartRateRecord.Sample(it.time.instant, it.bpm.coerceIn(1, 300)) },
+                    metadata = meta(RecordIds.forSample("dayheart", hour, hour.plus(1, ChronoUnit.HOURS), "allday#$idx"), true),
+                )
+            }
+        }
+    }
 
     /** 시간순 정렬, 같은 시각 중복 제거, 최대 1,000개씩 겹치지 않게 나눔 */
     private fun heartChunks(samples: List<HeartSample>, kind: String, scope: String, fromWatch: Boolean): List<HeartRateRecord> {
