@@ -37,11 +37,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: android-actions/setup-android@v3
+      - name: Install SDK 36 (runner에 이미 있는 Android SDK 사용)
         if: steps.v.outputs.exists == 'false'
-      - name: Install SDK 36
-        if: steps.v.outputs.exists == 'false'
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          SDKM=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0"
       - name: Decode keystore
         if: steps.v.outputs.exists == 'false'
         run: echo "${{ secrets.HB_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
