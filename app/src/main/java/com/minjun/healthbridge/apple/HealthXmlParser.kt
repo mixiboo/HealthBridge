@@ -104,7 +104,7 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
                     options.allDayHeartRate -> sink.onAllDayHeart(sample)
                 }
             }
-            SLEEP -> sink.onSleep(SleepSample(start, end, value, fromWatch))
+            SLEEP -> sink.onSleep(SleepSample(start, end, value, fromWatch, source ?: ""))
             else -> {
                 val v = value.toDoubleOrNull() ?: return
                 sink.onQuantity(QuantitySample(type, start, end, v, p.attr("unit") ?: "", fromWatch))
@@ -126,6 +126,7 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
         var kcal = energyToKcal(p.attr("totalEnergyBurned"), p.attr("totalEnergyBurnedUnit"))
         var meters = distanceToMeters(p.attr("totalDistance"), p.attr("totalDistanceUnit"))
         var indoor: Boolean? = null
+        var zone: java.time.ZoneId? = null
         val routes = ArrayList<String>()
 
         val depth = p.depth
@@ -143,18 +144,21 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
                             distanceToMeters(sum, unit)?.let { meters = it }
                     }
                 }
-                "MetadataEntry" -> if (p.depth == depth + 1 && p.attr("key") == "HKIndoorWorkout") {
-                    indoor = p.attr("value") == "1"
+                "MetadataEntry" -> if (p.depth == depth + 1) when (p.attr("key")) {
+                    "HKIndoorWorkout" -> indoor = p.attr("value") == "1"
+                    // 내보내기 날짜는 내보낸 폰의 시간대로 적혀 있음 → 기록 당시 시간대로 바꾼다
+                    "HKTimeZone" -> zone = p.attr("value")?.let { runCatching { java.time.ZoneId.of(it) }.getOrNull() }
                 }
                 "FileReference" -> p.attr("path")?.let { routes += it }
             }
             event = p.next()
         }
         if (start == null || end == null) return null
+        fun local(t: AppleTime) = zone?.let { AppleTime(t.instant, it.rules.getOffset(t.instant)) } ?: t
         return AppleWorkout(
             activityType = type,
-            start = start,
-            end = end,
+            start = local(start),
+            end = local(end),
             sourceName = source,
             isFromWatch = isWatch(source, device),
             activeKcal = kcal,

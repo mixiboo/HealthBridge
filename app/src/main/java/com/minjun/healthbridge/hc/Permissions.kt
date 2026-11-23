@@ -14,6 +14,10 @@ import com.minjun.healthbridge.model.ImportOptions
 
 /** 선택한 항목에 필요한 Health Connect 권한만 요청한다 */
 object Permissions {
+    /** 이것만 있으면 가져오기 가능. 읽기 권한은 "이미 옮긴 운동 건너뛰기"에만 쓰는 선택 사항 */
+    fun required(o: ImportOptions): Set<String> =
+        forOptions(o) - HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+
     fun forOptions(o: ImportOptions): Set<String> = buildSet {
         if (o.workouts) {
             add(HealthPermission.getWritePermission(ExerciseSessionRecord::class))

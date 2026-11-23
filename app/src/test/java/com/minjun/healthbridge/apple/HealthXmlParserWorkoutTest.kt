@@ -46,6 +46,23 @@ class HealthXmlParserWorkoutTest {
         assertEquals(239.0, w.activeKcal!!, 0.1)
     }
 
+    @Test fun hk_time_zone_metadata_sets_local_offset() {
+        val xml = """<?xml version="1.0"?><HealthData>
+ <Workout workoutActivityType="HKWorkoutActivityTypeRunning" sourceName="민준의 Apple Watch" startDate="2025-07-11 02:00:00 +0900" endDate="2025-07-11 02:30:00 +0900">
+  <MetadataEntry key="HKTimeZone" value="America/Los_Angeles"/>
+ </Workout>
+ <Workout workoutActivityType="HKWorkoutActivityTypeWalking" sourceName="민준의 Apple Watch" startDate="2025-07-12 02:00:00 +0900" endDate="2025-07-12 02:30:00 +0900">
+  <MetadataEntry key="HKTimeZone" value="Not/AZone"/>
+ </Workout>
+</HealthData>"""
+        val ws = parser.readWorkouts(xml.byteInputStream(), watchOnly = true)
+        val la = ws.first { it.activityType.endsWith("Running") }
+        assertEquals(java.time.ZoneOffset.of("-07:00"), la.start.offset)
+        assertEquals(java.time.ZoneOffset.of("-07:00"), la.end.offset)
+        assertEquals(java.time.Instant.parse("2025-07-10T17:00:00Z"), la.start.instant)
+        assertEquals(java.time.ZoneOffset.of("+09:00"), ws.first { it.activityType.endsWith("Walking") }.start.offset)
+    }
+
     @Test fun counts_all_watch_workouts() {
         assertEquals(4, read(true).size)
         assertEquals(5, read(false).size)

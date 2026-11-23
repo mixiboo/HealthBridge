@@ -177,6 +177,25 @@ class RecordFactoryTest {
         assertNull(RecordFactory.quantity(QuantitySample("HKQuantityTypeIdentifierHeartRateVariabilitySDNN", s, e, 40.0, "ms", true)))
     }
 
+    @Test fun sleep_overlapping_sources_are_cleaned() {
+        fun ss(a: String, b: String, v: String, src: String) =
+            SleepSample(t("2025-01-03 $a:00 +0900"), t("2025-01-03 $b:00 +0900"), "HKCategoryValueSleepAnalysis$v", src.contains("Watch"), src)
+        val sessions = RecordFactory.sleep(listOf(
+            ss("00:30", "07:00", "InBed", "민준의 iPhone"),
+            ss("01:00", "02:00", "AsleepDeep", "민준의 Apple Watch"),
+            ss("01:00", "02:00", "AsleepDeep", "민준의 Apple Watch"), // 완전 중복
+            ss("01:50", "03:00", "AsleepCore", "민준의 Apple Watch"), // 앞 단계와 10분 겹침
+            ss("01:00", "06:00", "Asleep", "SleepApp"),
+        ))
+        sessions.forEach { s ->
+            s.stages.zipWithNext().forEach { (a, b) -> assertTrue("overlap ${a} ${b}", !b.startTime.isBefore(a.endTime)) }
+        }
+        assertEquals("겹치는 잠은 애플워치 것 하나만", 1, sessions.size)
+        val watch = sessions.single { it.stages.any { st -> st.stage == SleepSessionRecord.STAGE_TYPE_DEEP } }
+        assertEquals(listOf(SleepSessionRecord.STAGE_TYPE_DEEP, SleepSessionRecord.STAGE_TYPE_LIGHT), watch.stages.map { it.stage })
+        assertTrue(sessions.none { s -> s.stages.any { it.stage == SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED } && s.stages.any { it.stage != SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED } })
+    }
+
     @Test fun sleep_stages() {
         fun ss(a: String, b: String, v: String) = SleepSample(t("2025-01-03 $a:00 +0900"), t("2025-01-03 $b:00 +0900"), "HKCategoryValueSleepAnalysis$v", true)
         val sessions = RecordFactory.sleep(listOf(

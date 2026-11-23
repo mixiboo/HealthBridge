@@ -131,7 +131,7 @@ fun ProgressScreen(p: ImportProgress) = Page {
     Text(if (p.total > 0) "${p.phase} ${p.done}/${p.total}" else p.phase)
     if (p.total > 0) LinearProgressIndicator(progress = { p.done.toFloat() / p.total }, modifier = Modifier.fillMaxWidth())
     else LinearProgressIndicator(Modifier.fillMaxWidth())
-    Text("화면을 꺼도 계속 진행돼요. 알림에서 진행 상황을 볼 수 있어요.", style = MaterialTheme.typography.bodySmall)
+    Text("화면을 끄거나 다른 앱을 써도 계속 진행돼요. 알림에서 진행 상황을 볼 수 있어요.", style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable
@@ -141,6 +141,7 @@ fun DoneScreen(r: ImportReport, onOpenSamsungHealth: () -> Unit, onAgain: () -> 
         Text("새로 추가한 운동 ${r.newWorkouts}개")
         Text("이미 있던 운동 ${r.alreadyThere}개")
         Text("Health Connect에 쓴 기록 ${r.recordsWritten}개")
+        if (!r.existingChecked) Text("ℹ️ 이미 옮긴 운동을 확인하지 못해서 전부 다시 썼어요 (같은 기록이라 중복은 안 생겨요)", style = MaterialTheme.typography.bodySmall)
         if (r.failed > 0) Text("실패 ${r.failed}개 😢 '이미 옮긴 운동도 다시 쓰기'를 켜고 한 번 더 하면 빠진 걸 채울 수 있어요", color = MaterialTheme.colorScheme.error)
     } }
     Text("Samsung Health에 뜨기까지 몇 분 걸릴 수 있어요.")

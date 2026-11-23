@@ -26,7 +26,6 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     override suspend fun doWork(): Result {
         val uri = Uri.parse(inputData.getString(KEY_URI) ?: return Result.failure())
         val options = optionsFrom(inputData)
-        setForeground(foregroundInfo("준비 중…", 0, 0))
 
         val client = HealthConnectClient.getOrCreate(applicationContext)
         val writer = HealthConnectWriter(client)
@@ -34,10 +33,13 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             open = { applicationContext.contentResolver.openInputStream(uri) ?: throw NotAppleExportException() },
             parserFactory = { Xml.newPullParser() },
         )
+        // 이미 옮긴 운동 목록은 화면에 있을 때(포그라운드) 미리 읽어 파일로 넘겨받는다
+        val idsFile = inputData.getString(KEY_EXISTING_FILE)?.let { java.io.File(it) }
         val pipeline = ImportPipeline(reader, writer) {
-            runCatching { writer.existingWorkoutIds(applicationContext.packageName) }.getOrDefault(emptySet())
+            idsFile?.takeIf { it.exists() }?.readLines()?.filter { it.isNotBlank() }?.toSet()
         }
         return try {
+            setForeground(foregroundInfo("준비 중…", 0, 0))
             var lastShown = -1
             val report = pipeline.run(options) { p ->
                 setProgress(workDataOf(KEY_PHASE to p.phase, KEY_DONE to p.done, KEY_TOTAL to p.total))
@@ -50,6 +52,7 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 workDataOf(
                     KEY_NEW to report.newWorkouts, KEY_EXISTING to report.alreadyThere,
                     KEY_WRITTEN to report.recordsWritten, KEY_FAILED to report.failed,
+                    KEY_CHECKED to report.existingChecked,
                 ),
             )
         } catch (e: NotAppleExportException) {
@@ -90,11 +93,13 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         const val KEY_PHASE = "phase"; const val KEY_DONE = "done"; const val KEY_TOTAL = "total"
         const val KEY_NEW = "new"; const val KEY_EXISTING = "existing"; const val KEY_WRITTEN = "written"; const val KEY_FAILED = "failed"
         const val KEY_ERROR = "error"
+        const val KEY_EXISTING_FILE = "existingFile"
+        const val KEY_CHECKED = "checked"
         private const val CHANNEL = "import"
         private const val NOTIFICATION_ID = 7
 
-        fun inputFor(uri: Uri, o: ImportOptions): Data = workDataOf(
-            KEY_URI to uri.toString(),
+        fun inputFor(uri: Uri, o: ImportOptions, existingIdsFile: String?): Data = workDataOf(
+            KEY_URI to uri.toString(), KEY_EXISTING_FILE to existingIdsFile,
             "workouts" to o.workouts, "workoutHeartRate" to o.workoutHeartRate, "routes" to o.routes,
             "allDayHeartRate" to o.allDayHeartRate, "restingHrAndWeight" to o.restingHrAndWeight,
             "stepsAndSleep" to o.stepsAndSleep, "watchOnly" to o.watchOnly, "rewriteExisting" to o.rewriteExisting,

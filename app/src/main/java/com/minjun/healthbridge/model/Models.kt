@@ -31,7 +31,13 @@ data class QuantitySample(
     val isFromWatch: Boolean,
 )
 
-data class SleepSample(val start: AppleTime, val end: AppleTime, val value: String, val isFromWatch: Boolean)
+data class SleepSample(
+    val start: AppleTime,
+    val end: AppleTime,
+    val value: String,
+    val isFromWatch: Boolean,
+    val sourceName: String = "",
+)
 
 data class ImportOptions(
     val workouts: Boolean = true,

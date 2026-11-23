@@ -144,16 +144,21 @@ object RecordFactory {
         }
     }
 
-    /** 30분 이상 끊기면 다른 잠으로 본다 */
+    /**
+     * 수면: 출처별로 정리(중복 제거, 단계가 있으면 '침대에 있음' 제외, 겹치는 구간 잘라내기)한 뒤
+     * 30분 이상 끊기면 다른 잠으로 나눈다. 출처끼리 겹치는 잠은 애플워치 → 단계가 많은 순으로 하나만 남긴다.
+     */
     fun sleep(samples: List<SleepSample>): List<SleepSessionRecord> {
-        val sorted = samples.filter { it.start.instant.isBefore(it.end.instant) }.sortedBy { it.start.instant }
-        val groups = ArrayList<MutableList<SleepSample>>()
-        for (s in sorted) {
-            val last = groups.lastOrNull()
-            if (last != null && !s.start.instant.isAfter(last.maxOf { it.end.instant }.plus(SLEEP_GAP))) last += s
-            else groups += mutableListOf(s)
-        }
-        return groups.map { g ->
+        val sessions = samples.groupBy { it.sourceName }.values.flatMap { sessionsOf(cleanSource(it)) }
+        val kept = ArrayList<List<SleepSample>>()
+        sessions
+            .sortedWith(compareByDescending<List<SleepSample>> { g -> g.any { it.isFromWatch } }.thenByDescending { it.size })
+            .forEach { g ->
+                val gs = g.first().start.instant; val ge = g.maxOf { it.end.instant }
+                val overlaps = kept.any { k -> gs.isBefore(k.maxOf { it.end.instant }) && k.first().start.instant.isBefore(ge) }
+                if (!overlaps) kept += g
+            }
+        return kept.sortedBy { it.first().start.instant }.map { g ->
             val start = g.first().start
             val endSample = g.maxBy { it.end.instant }
             SleepSessionRecord(
@@ -163,6 +168,29 @@ object RecordFactory {
                 stages = g.map { SleepSessionRecord.Stage(it.start.instant, it.end.instant, stage(it.value)) },
             )
         }
+    }
+
+    private fun cleanSource(samples: List<SleepSample>): List<SleepSample> {
+        val valid = samples.filter { it.start.instant.isBefore(it.end.instant) }.distinctBy { Triple(it.start.instant, it.end.instant, it.value) }
+        val hasStages = valid.any { !it.value.endsWith("InBed") }
+        val sorted = (if (hasStages) valid.filterNot { it.value.endsWith("InBed") } else valid).sortedBy { it.start.instant }
+        val out = ArrayList<SleepSample>()
+        for (s in sorted) {
+            val prevEnd = out.lastOrNull()?.end
+            val clipped = if (prevEnd != null && s.start.instant.isBefore(prevEnd.instant)) s.copy(start = prevEnd) else s
+            if (clipped.start.instant.isBefore(clipped.end.instant)) out += clipped
+        }
+        return out
+    }
+
+    private fun sessionsOf(sorted: List<SleepSample>): List<List<SleepSample>> {
+        val groups = ArrayList<MutableList<SleepSample>>()
+        for (s in sorted) {
+            val last = groups.lastOrNull()
+            if (last != null && !s.start.instant.isAfter(last.last().end.instant.plus(SLEEP_GAP))) last += s
+            else groups += mutableListOf(s)
+        }
+        return groups
     }
 
     private fun stage(v: String): Int = when (v.removePrefix("HKCategoryValueSleepAnalysis")) {

@@ -79,6 +79,14 @@ class ImportPipelineTest {
         assertEquals(all.getValue(70L), recent.getValue(70L))
     }
 
+    @Test fun unknown_existing_ids_reported_as_unchecked() = runTest {
+        val report = ImportPipeline(reader, FakeWriter()) { null }.run(ImportOptions()) {}
+        assertEquals(false, report.existingChecked)
+        assertEquals(4, report.newWorkouts)
+        val ok = ImportPipeline(reader, FakeWriter()) { emptySet() }.run(ImportOptions()) {}
+        assertEquals(true, ok.existingChecked)
+    }
+
     @Test fun progress_reaches_total() = runTest {
         val seen = ArrayList<ImportProgress>()
         ImportPipeline(reader, FakeWriter()) { emptySet() }.run(ImportOptions()) { seen += it }

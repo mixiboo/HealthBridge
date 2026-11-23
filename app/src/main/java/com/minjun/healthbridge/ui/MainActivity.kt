@@ -39,13 +39,12 @@ class MainActivity : ComponentActivity() {
 
     private val askHealth = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
         val s = vm.state.value as? UiState.Preview ?: return@registerForActivityResult
-        val needed = Permissions.forOptions(s.options)
-        if (granted.containsAll(needed)) vm.start()
+        if (granted.containsAll(Permissions.required(s.options))) vm.start()
         else vm.showError("Health Connect 권한이 필요해요 🙏\n권한 화면에서 선택한 항목을 모두 허용해주세요.")
     }
 
     private val askSample = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
-        if (granted.containsAll(Permissions.forOptions(ImportOptions()))) vm.insertSample()
+        if (granted.containsAll(Permissions.required(ImportOptions()))) vm.insertSample()
         else vm.showError("Health Connect 권한이 필요해요 🙏")
     }
 
@@ -56,7 +55,7 @@ class MainActivity : ComponentActivity() {
         val needed = Permissions.forOptions(ImportOptions())
         lifecycleScope.launch {
             val have = HealthConnectClient.getOrCreate(this@MainActivity).permissionController.getGrantedPermissions()
-            if (have.containsAll(needed)) vm.insertSample() else askSample.launch(needed)
+            if (have.containsAll(Permissions.required(ImportOptions()))) vm.insertSample() else askSample.launch(needed)
         }
     }
 
@@ -103,10 +102,7 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
             else -> null
         }
-        if (uri != null) {
-            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            vm.open(uri)
-        }
+        if (uri != null) vm.openShared(uri)
     }
 
     private fun startImport() {
@@ -115,10 +111,9 @@ class MainActivity : ComponentActivity() {
             vm.showError("Health Connect를 쓸 수 없어요 😢\n설정 → 보안 및 개인정보 보호 → Health Connect를 확인하거나 업데이트해주세요.")
             return
         }
-        val needed = Permissions.forOptions(s.options)
         lifecycleScope.launch {
             val have = HealthConnectClient.getOrCreate(this@MainActivity).permissionController.getGrantedPermissions()
-            if (have.containsAll(needed)) vm.start() else askHealth.launch(needed)
+            if (have.containsAll(Permissions.forOptions(s.options))) vm.start() else askHealth.launch(Permissions.forOptions(s.options))
         }
     }
 

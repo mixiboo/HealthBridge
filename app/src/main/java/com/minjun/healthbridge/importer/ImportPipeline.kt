@@ -19,12 +19,20 @@ import java.time.Instant
 
 data class ImportPreview(val workoutCount: Int, val firstDate: Instant?, val lastDate: Instant?, val routeCount: Int)
 data class ImportProgress(val phase: String, val done: Int, val total: Int)
-data class ImportReport(val newWorkouts: Int, val alreadyThere: Int, val recordsWritten: Int, val failed: Int)
+data class ImportReport(
+    val newWorkouts: Int,
+    val alreadyThere: Int,
+    val recordsWritten: Int,
+    val failed: Int,
+    /** false: 이미 옮긴 운동을 확인하지 못해 전부 새로 썼음 (같은 ID라 중복은 없음) */
+    val existingChecked: Boolean = true,
+)
 
 class ImportPipeline(
     private val reader: AppleExportReader,
     private val writer: RecordWriter,
-    private val existingIds: suspend () -> Set<String>,
+    /** null = 확인 실패 (권한 없음 등) */
+    private val existingIds: suspend () -> Set<String>?,
 ) {
     fun preview(watchOnly: Boolean): ImportPreview {
         val ws = reader.readWorkouts(watchOnly)
@@ -53,7 +61,8 @@ class ImportPipeline(
             (options.from == null || !it.end.instant.isBefore(options.from)) &&
                 (options.to == null || !it.start.instant.isAfter(options.to))
         }
-        val known = existingIds()
+        val knownOrNull = existingIds()
+        val known = knownOrNull.orEmpty()
         val isKnown = { w: AppleWorkout -> RecordIds.workout(w) in known }
         val fresh = when {
             !options.workouts -> emptyList()
@@ -144,6 +153,7 @@ class ImportPipeline(
             alreadyThere = if (options.workouts) inRange.count(isKnown) else 0,
             recordsWritten = written,
             failed = failed,
+            existingChecked = knownOrNull != null,
         )
     }
 

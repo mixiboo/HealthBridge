@@ -56,6 +56,7 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                         info.outputData.getInt(ImportWorker.KEY_EXISTING, 0),
                         info.outputData.getInt(ImportWorker.KEY_WRITTEN, 0),
                         info.outputData.getInt(ImportWorker.KEY_FAILED, 0),
+                        info.outputData.getBoolean(ImportWorker.KEY_CHECKED, true),
                     ),
                 )
                 WorkInfo.State.FAILED -> UiState.Error(info.outputData.getString(ImportWorker.KEY_ERROR) ?: "가져오기에 실패했어요")
@@ -86,16 +87,46 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
 
     fun start() {
         val s = _state.value as? UiState.Preview ?: return
-        val request = OneTimeWorkRequestBuilder<ImportWorker>()
-            .setInputData(ImportWorker.inputFor(s.uri, s.options))
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
-        _state.value = UiState.Running(ImportProgress("준비 중", 0, s.preview.workoutCount))
-        work.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+        _state.value = UiState.Running(ImportProgress("이미 옮긴 운동 확인 중", 0, s.preview.workoutCount))
+        viewModelScope.launch {
+            // Health Connect 읽기는 앱이 화면에 있을 때만 확실히 되므로 여기서 미리 읽는다
+            val idsFile = withContext(Dispatchers.IO) {
+                runCatching {
+                    val app = getApplication<Application>()
+                    val ids = com.minjun.healthbridge.hc.HealthConnectWriter(
+                        androidx.health.connect.client.HealthConnectClient.getOrCreate(app),
+                    ).existingWorkoutIds(app.packageName)
+                    java.io.File(app.cacheDir, "existing-ids.txt").apply { writeText(ids.joinToString("\n")) }.path
+                }.getOrNull()
+            }
+            val request = OneTimeWorkRequestBuilder<ImportWorker>()
+                .setInputData(ImportWorker.inputFor(s.uri, s.options, idsFile))
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .build()
+            work.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+        }
+    }
+
+    /** 다른 앱에서 공유받은 파일: 임시 권한이 사라져도 되도록 앱 전용 공간에 복사한 뒤 연다 */
+    fun openShared(uri: Uri) {
+        _state.value = UiState.Reading
+        viewModelScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                runCatching {
+                    val app = getApplication<Application>()
+                    com.minjun.healthbridge.importer.ImportFiles.copyToPrivate(
+                        app.contentResolver.openInputStream(uri) ?: error("열 수 없음"), java.io.File(app.filesDir, "import"),
+                    )
+                }.getOrNull()
+            }
+            if (file == null) showError("파일을 복사하지 못했어요 😢 저장 공간을 확인하거나, 앱에서 'zip 고르기'로 열어주세요")
+            else open(Uri.fromFile(file))
+        }
     }
 
     fun reset() {
         work.pruneWork()
+        com.minjun.healthbridge.importer.ImportFiles.clear(java.io.File(getApplication<Application>().filesDir, "import"))
         _state.value = UiState.Pick
     }
 
