@@ -35,7 +35,8 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         )
         // 이미 옮긴 운동 목록은 화면에 있을 때(포그라운드) 미리 읽어 파일로 넘겨받는다
         val idsFile = inputData.getString(KEY_EXISTING_FILE)?.let { java.io.File(it) }
-        val pipeline = ImportPipeline(reader, writer) {
+        val occupiedFile = inputData.getString(KEY_OCCUPIED_FILE)?.let { java.io.File(it) }
+        val pipeline = ImportPipeline(reader, writer, occupiedDays = { occupiedFile?.takeIf { it.exists() }?.let(OccupiedDaysFile::read) }) {
             idsFile?.takeIf { it.exists() }?.readLines()?.filter { it.isNotBlank() }?.toSet()
         }
         return try {
@@ -121,17 +122,19 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         const val KEY_EXISTING_FILE = "existingFile"
         const val KEY_CHECKED = "checked"
         const val KEY_FILE_NAME = "fileName"
+        const val KEY_OCCUPIED_FILE = "occupiedFile"
         const val KEY_FILE_SIZE = "fileSize"
         private const val CHANNEL = "import"
         private const val NOTIFICATION_ID = 7
 
-        fun inputFor(uri: Uri, o: ImportOptions, existingIdsFile: String?, fileName: String, fileSize: Long): Data = workDataOf(
-            KEY_URI to uri.toString(), KEY_EXISTING_FILE to existingIdsFile,
+        fun inputFor(uri: Uri, o: ImportOptions, existingIdsFile: String?, fileName: String, fileSize: Long, occupiedFile: String? = null): Data = workDataOf(
+            KEY_URI to uri.toString(), KEY_EXISTING_FILE to existingIdsFile, KEY_OCCUPIED_FILE to occupiedFile,
             KEY_FILE_NAME to fileName, KEY_FILE_SIZE to fileSize,
             "workoutTypes" to o.workoutTypes?.toTypedArray(),
             "workouts" to o.workouts, "workoutHeartRate" to o.workoutHeartRate, "routes" to o.routes,
-            "allDayHeartRate" to o.allDayHeartRate, "restingHrAndWeight" to o.restingHrAndWeight,
-            "stepsAndSleep" to o.stepsAndSleep, "watchOnly" to o.watchOnly, "rewriteExisting" to o.rewriteExisting,
+            "allDayHeartRate" to o.allDayHeartRate, "sleep" to o.sleep, "activity" to o.activity, "body" to o.body,
+            "vitals" to o.vitals, "hydration" to o.hydration, "avoidGalaxyOverlap" to o.avoidGalaxyOverlap,
+            "watchOnly" to o.watchOnly, "rewriteExisting" to o.rewriteExisting,
             "from" to (o.from?.toEpochMilli() ?: -1L), "to" to (o.to?.toEpochMilli() ?: -1L),
         )
 
@@ -140,8 +143,12 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             workoutHeartRate = d.getBoolean("workoutHeartRate", true),
             routes = d.getBoolean("routes", true),
             allDayHeartRate = d.getBoolean("allDayHeartRate", false),
-            restingHrAndWeight = d.getBoolean("restingHrAndWeight", false),
-            stepsAndSleep = d.getBoolean("stepsAndSleep", false),
+            sleep = d.getBoolean("sleep", false),
+            activity = d.getBoolean("activity", false),
+            body = d.getBoolean("body", false),
+            vitals = d.getBoolean("vitals", false),
+            hydration = d.getBoolean("hydration", false),
+            avoidGalaxyOverlap = d.getBoolean("avoidGalaxyOverlap", true),
             watchOnly = d.getBoolean("watchOnly", true),
             rewriteExisting = d.getBoolean("rewriteExisting", false),
             workoutTypes = d.getStringArray("workoutTypes")?.toSet(),

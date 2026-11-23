@@ -37,7 +37,7 @@ class ImportPipelineRobustnessTest {
 
     @Test fun zero_duration_workout_and_bad_steps_do_not_stop_import() = runTest {
         val w = Collect()
-        val r = ImportPipeline(reader, w) { emptySet() }.run(ImportOptions(stepsAndSleep = true)) {}
+        val r = ImportPipeline(reader, w) { emptySet() }.run(ImportOptions(activity = true, sleep = true)) {}
         assertEquals(listOf(ExerciseSessionRecord.EXERCISE_TYPE_YOGA), w.all.filterIsInstance<ExerciseSessionRecord>().map { it.exerciseType })
         assertTrue(r.failed >= 2) // 0분 운동 + 걸음 200만
     }

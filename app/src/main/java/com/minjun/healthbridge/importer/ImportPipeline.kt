@@ -11,6 +11,9 @@ import com.minjun.healthbridge.hc.RecordWriter
 import com.minjun.healthbridge.model.AppleWorkout
 import com.minjun.healthbridge.model.HeartSample
 import com.minjun.healthbridge.model.ImportOptions
+import com.minjun.healthbridge.model.OccupiedDays
+import com.minjun.healthbridge.apple.AppleTypes
+import com.minjun.healthbridge.model.AppleTime
 import com.minjun.healthbridge.model.QuantitySample
 import com.minjun.healthbridge.model.RoutePoint
 import com.minjun.healthbridge.model.SleepSample
@@ -35,6 +38,8 @@ data class ImportReport(
 class ImportPipeline(
     private val reader: AppleExportReader,
     private val writer: RecordWriter,
+    /** Samsung Health에 이미 기록이 있는 날. null = 모름(건너뛰지 않음) */
+    private val occupiedDays: suspend () -> OccupiedDays? = { null },
     /** null = 확인 실패 (권한 없음 등) */
     private val existingIds: suspend () -> Set<String>?,
 ) {
@@ -84,21 +89,37 @@ class ImportPipeline(
 
         // 2회차: 심박·선택 항목. 하루 심박/선택 항목은 모이는 대로 나눠 쓴다.
         onProgress(ImportProgress("심박 읽는 중", 0, total))
+        val occupied = if (options.avoidGalaxyOverlap) occupiedDays() else null
+        fun localDay(t: AppleTime) = t.instant.atOffset(t.offset).toLocalDate()
+        fun skipDay(rule: AppleTypes.DayRule, t: AppleTime): Boolean = occupied != null && when (rule) {
+            AppleTypes.DayRule.STEPS -> localDay(t) in occupied.stepDays
+            AppleTypes.DayRule.WATCH -> localDay(t) in occupied.watchDays
+            AppleTypes.DayRule.NONE -> false
+        }
+        val bpSys = HashMap<java.time.Instant, QuantitySample>()
+        val bpDia = HashMap<java.time.Instant, QuantitySample>()
         val heartByWorkout = HashMap<AppleWorkout, HeartBuffer>()
         val dayHeart = HeartBuffer() // 시간대 경계가 흔들리지 않게 끝까지 모았다가 1시간 단위로 쓴다
         val quantities = ArrayList<Record>()
         val sleep = ArrayList<SleepSample>()
         val needRecords = (options.workoutHeartRate && fresh.isNotEmpty()) ||
-            options.allDayHeartRate || options.restingHrAndWeight || options.stepsAndSleep
+            options.allDayHeartRate || options.sleep || options.activity || options.body || options.vitals || options.hydration
         if (needRecords) {
             reader.readRecords(options, inRange, object : RecordSink {
                 override fun onWorkoutHeart(workout: AppleWorkout, sample: HeartSample) {
                     if (workout in freshSet) heartByWorkout.getOrPut(workout) { HeartBuffer() }.add(sample)
                 }
                 override fun onAllDayHeart(sample: HeartSample) {
+                    if (skipDay(AppleTypes.DayRule.WATCH, sample.time)) return
                     dayHeart.add(sample)
                 }
                 override fun onQuantity(sample: QuantitySample) {
+                    val rule = AppleTypes.specs[sample.type]?.dayRule ?: AppleTypes.DayRule.NONE
+                    if (skipDay(rule, sample.start)) return
+                    when (sample.type) {
+                        AppleTypes.BP_SYSTOLIC -> { bpSys[sample.start.instant] = sample; return }
+                        AppleTypes.BP_DIASTOLIC -> { bpDia[sample.start.instant] = sample; return }
+                    }
                     runCatching { RecordFactory.quantity(sample) }
                         .onSuccess { r -> r?.let { quantities += it } }
                         .onFailure { failed += 1 } // Health Connect가 받지 않는 값 (예: 걸음 100만 초과)
@@ -114,7 +135,12 @@ class ImportPipeline(
         }
         flush(hourly)
         flush(quantities)
-        flush(safe { RecordFactory.sleep(sleep) })
+        // 수면은 깬 날 기준으로 갤럭시워치 날을 건너뛴다
+        flush(safe { RecordFactory.sleep(sleep) }.filterNot { s ->
+            skipDay(AppleTypes.DayRule.WATCH, AppleTime(s.endTime, s.endZoneOffset ?: java.time.ZoneOffset.UTC))
+        })
+        // 수축기·이완기 짝이 맞는 것만 혈압으로
+        flush(bpSys.mapNotNull { (t, sys) -> bpDia[t]?.let { dia -> runCatching { RecordFactory.bloodPressure(sys, dia) }.getOrNull() } })
 
         // 운동 기록: 경로 없는 운동은 바로, 경로 있는 운동은 경로 파일을 읽는 대로 하나씩 만들어 쓴다
         var done = 0

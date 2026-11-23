@@ -135,12 +135,12 @@ fun ReadingContent() = Page {
     }
 }
 
-private enum class Preset(val label: String) { RECOMMENDED("추천"), WORKOUT_ONLY("운동만"), ALL("전부") }
+private enum class Preset(val label: String) { ALL("전부"), RECOMMENDED("걸음 빼고"), WORKOUT_ONLY("운동만") }
 
 private fun ImportOptions.apply(p: Preset): ImportOptions = when (p) {
-    Preset.RECOMMENDED -> copy(workouts = true, workoutHeartRate = true, routes = true, allDayHeartRate = false, restingHrAndWeight = false, stepsAndSleep = false)
-    Preset.WORKOUT_ONLY -> copy(workouts = true, workoutHeartRate = false, routes = false, allDayHeartRate = false, restingHrAndWeight = false, stepsAndSleep = false)
-    Preset.ALL -> copy(workouts = true, workoutHeartRate = true, routes = true, allDayHeartRate = true, restingHrAndWeight = true, stepsAndSleep = true)
+    Preset.RECOMMENDED -> copy(workouts = true, workoutHeartRate = true, routes = true, allDayHeartRate = false, sleep = true, activity = false, body = true, vitals = true, hydration = true)
+    Preset.WORKOUT_ONLY -> copy(workouts = true, workoutHeartRate = true, routes = true, allDayHeartRate = false, sleep = false, activity = false, body = false, vitals = false, hydration = false)
+    Preset.ALL -> copy(workouts = true, workoutHeartRate = true, routes = true, allDayHeartRate = true, sleep = true, activity = true, body = true, vitals = true, hydration = true)
 }
 
 private fun ImportOptions.preset(): Preset? = Preset.entries.firstOrNull { apply(it) == this }
@@ -159,6 +159,7 @@ fun PreviewContent(
         selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
     )
     val selectedTypes = options.workoutTypes ?: scan.workoutTypes.keys
+    fun c(short: String): Int = scan.byType[if (short == "SleepAnalysis") "HKCategoryTypeIdentifier$short" else "HKQuantityTypeIdentifier$short"] ?: 0
     val chosenWorkouts = scan.workoutTypes.filterKeys { it in selectedTypes }.values.sum()
 
     Column(Modifier.fillMaxSize()) {
@@ -196,10 +197,15 @@ fun PreviewContent(
             OptionChip("운동 기록", options.workouts, { onChange(options.copy(workouts = it)) }, "${n(scan.workoutCount)}개 · 종류·시간·거리·칼로리")
             OptionChip("운동 중 심박수 💓", options.workoutHeartRate, { onChange(options.copy(workoutHeartRate = it)) }, "평균·최대·차트·심박 구간")
             OptionChip("운동 경로 (GPS)", options.routes, { onChange(options.copy(routes = it)) }, "${n(scan.routeCount)}개 운동 · Samsung Health 지도에는 안 보여요")
+            OptionChip("수면 😴", options.sleep, { onChange(options.copy(sleep = it)) }, "${n(scan.sleep)}개 · 깊은 잠·REM·얕은 잠·깸")
             OptionChip("하루 전체 심박수", options.allDayHeartRate, { onChange(options.copy(allDayHeartRate = it)) }, "측정 ${n(scan.heartRate)}개 · 시간이 조금 걸려요")
-            OptionChip("안정 시 심박수 · 체중", options.restingHrAndWeight, { onChange(options.copy(restingHrAndWeight = it)) }, "안정 시 심박 ${n(scan.restingHeartRate)}개 · 체중 ${n(scan.weight)}개")
-            OptionChip("걸음 수 · 수면", options.stepsAndSleep, { onChange(options.copy(stepsAndSleep = it)) },
-                "걸음 ${n(scan.steps)}개 · 수면 ${n(scan.sleep)}개" + if (options.stepsAndSleep) "\n갤럭시워치와 같이 차면 두 번 기록될 수 있어요." else "")
+            OptionChip("활력 징후 🫁", options.vitals, { onChange(options.copy(vitals = it)) },
+                "안정 시 심박 ${n(c("RestingHeartRate"))} · SpO2 ${n(c("OxygenSaturation"))} · 호흡수 ${n(c("RespiratoryRate"))}\nVO2 max ${n(c("VO2Max"))} · 체온 ${n(c("BodyTemperature"))} · 혈압 ${n(c("BloodPressureSystolic"))} · 혈당 ${n(c("BloodGlucose"))}")
+            OptionChip("활동 🚶", options.activity, { onChange(options.copy(activity = it)) },
+                "걸음 ${n(c("StepCount"))} · 거리 ${n(c("DistanceWalkingRunning"))} · 활동 칼로리 ${n(c("ActiveEnergyBurned"))} · 층수 ${n(c("FlightsClimbed"))}\n폰이 이미 걸음을 센 날은 건너뛰어요")
+            OptionChip("몸 ⚖️", options.body, { onChange(options.copy(body = it)) },
+                "체중 ${n(c("BodyMass"))} · 키 ${n(c("Height"))} · 체지방률 ${n(c("BodyFatPercentage"))} · 제지방량 ${n(c("LeanBodyMass"))}")
+            OptionChip("물 마신 양 💧", options.hydration, { onChange(options.copy(hydration = it)) }, "${n(c("DietaryWater"))}개")
 
             // 운동 종류
             if (scan.workoutTypes.isNotEmpty()) {
@@ -254,6 +260,15 @@ fun PreviewContent(
                     Switch(checked = options.watchOnly, onCheckedChange = { onChange(options.copy(watchOnly = it)) })
                 }
             }
+            GlassCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("갤럭시워치 기록이 있는 날은 건너뛰기", style = MaterialTheme.typography.titleMedium)
+                        MutedPublic("수면·하루 심박·SpO2는 갤럭시워치를 찬 날, 걸음·거리·칼로리는 Samsung Health에 걸음이 있는 날 건너뛰어 두 번 쌓이지 않게 해요.")
+                    }
+                    Switch(checked = options.avoidGalaxyOverlap, onCheckedChange = { onChange(options.copy(avoidGalaxyOverlap = it)) })
+                }
+            }
             OptionChip("이미 옮긴 운동도 다시 쓰기", options.rewriteExisting, { onChange(options.copy(rewriteExisting = it)) }, "빠진 심박·칼로리를 채울 때 켜요. 중복은 생기지 않아요.")
             MutedPublic("HRV(심박 변이도)는 애플과 삼성의 계산 방식이 달라서 옮기지 않아요.")
         }
@@ -264,7 +279,7 @@ fun PreviewContent(
                 MutedPublic(if (options.workouts) "운동 ${n(chosenWorkouts)}개를 옮겨요 (기간에 따라 줄어들 수 있어요)" else "운동 기록은 옮기지 않아요")
                 PrimaryButton(
                     "옮기기 시작하기 🚀", onStart,
-                    enabled = (options.workouts && chosenWorkouts > 0) || options.allDayHeartRate || options.restingHrAndWeight || options.stepsAndSleep,
+                    enabled = (options.workouts && chosenWorkouts > 0) || options.allDayHeartRate || options.sleep || options.activity || options.body || options.vitals || options.hydration,
                 )
             }
         }

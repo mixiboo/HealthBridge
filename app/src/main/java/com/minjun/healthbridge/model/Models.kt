@@ -44,8 +44,18 @@ data class ImportOptions(
     val workoutHeartRate: Boolean = true,
     val routes: Boolean = true,
     val allDayHeartRate: Boolean = false,
-    val restingHrAndWeight: Boolean = false,
-    val stepsAndSleep: Boolean = false,
+    /** 수면 단계 */
+    val sleep: Boolean = false,
+    /** 걸음 수·걷기/달리기 거리·활동 칼로리·오른 층수 */
+    val activity: Boolean = false,
+    /** 체중·키·체지방률·제지방량 */
+    val body: Boolean = false,
+    /** 안정 시 심박·SpO2·호흡수·VO2 max·체온·혈압·혈당 */
+    val vitals: Boolean = false,
+    /** 물 마신 양 */
+    val hydration: Boolean = false,
+    /** 갤럭시워치(Samsung Health) 기록이 있는 날은 건너뛰기 */
+    val avoidGalaxyOverlap: Boolean = true,
     val watchOnly: Boolean = true,
     /** 옮길 운동 종류 (HKWorkoutActivityType*). null = 전부 */
     val workoutTypes: Set<String>? = null,
@@ -53,6 +63,19 @@ data class ImportOptions(
     val rewriteExisting: Boolean = false,
     val from: Instant? = null,
     val to: Instant? = null,
+) {
+    companion object {
+        /** 앱 화면의 기본값: 전부 옮기기 */
+        val ALL = ImportOptions(allDayHeartRate = true, sleep = true, activity = true, body = true, vitals = true, hydration = true)
+    }
+}
+
+/** Samsung Health에 이미 기록이 있는 날 (기기 현지 날짜) */
+data class OccupiedDays(
+    /** 걸음이 있는 날 (폰 또는 갤럭시워치) → 애플 걸음·거리·활동 칼로리·층수 건너뜀 */
+    val stepDays: Set<java.time.LocalDate>,
+    /** 심박이 있는 날 (갤럭시워치를 찬 날) → 애플 수면·하루 심박·SpO2·호흡수 등 건너뜀 */
+    val watchDays: Set<java.time.LocalDate>,
 )
 
 /** 미리보기용: 파일 안에 항목별로 몇 개 들어있는지 */
@@ -67,4 +90,6 @@ data class ScanSummary(
     val routeCount: Int,
     val firstDate: java.time.Instant?,
     val lastDate: java.time.Instant?,
+    /** 애플 기록 종류(HK...)별 개수 */
+    val byType: Map<String, Int> = emptyMap(),
 )

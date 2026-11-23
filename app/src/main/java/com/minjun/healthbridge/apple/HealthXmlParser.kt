@@ -49,6 +49,7 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
         var workouts = 0; var routes = 0
         var first: java.time.Instant? = null; var last: java.time.Instant? = null
         var hr = 0; var rhr = 0; var weight = 0; var steps = 0; var sleep = 0
+        val byType = HashMap<String, Int>()
         var event = p.eventType
         while (event != XmlPullParser.END_DOCUMENT) {
             if (event == XmlPullParser.START_TAG && p.depth == 2) {
@@ -66,13 +67,17 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
                     }
                     "Record" -> {
                         val type = p.attr("type")
-                        val ok = type == BODY_MASS || !watchOnly || isWatch(p.attr("sourceName"), p.attr("device"))
-                        if (ok) when (type) {
-                            HEART_RATE -> hr++
-                            RESTING_HR -> rhr++
-                            BODY_MASS -> weight++
-                            STEP_COUNT -> steps++
-                            SLEEP -> sleep++
+                        val spec = type?.let { AppleTypes.specs[it] }
+                        val ok = spec != null && (spec.anySource || !watchOnly || isWatch(p.attr("sourceName"), p.attr("device")))
+                        if (ok) {
+                            byType.merge(type!!, 1, Int::plus)
+                            when (type) {
+                                HEART_RATE -> hr++
+                                RESTING_HR -> rhr++
+                                BODY_MASS -> weight++
+                                STEP_COUNT -> steps++
+                                SLEEP -> sleep++
+                            }
                         }
                         skip(p)
                     }
@@ -81,7 +86,7 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
             }
             event = p.next()
         }
-        return com.minjun.healthbridge.model.ScanSummary(workouts, types, hr, rhr, weight, steps, sleep, routes, first, last)
+        return com.minjun.healthbridge.model.ScanSummary(workouts, types, hr, rhr, weight, steps, sleep, routes, first, last, byType)
     }
 
     /** 2회차: Record 요소를 스트리밍하며 운동 구간 심박과 선택 항목을 sink로 보낸다. HRV는 절대 보내지 않는다. */
@@ -120,21 +125,17 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
         sink: RecordSink,
     ) {
         val type = p.attr("type") ?: return
-        val wanted = when (type) {
-            HEART_RATE -> options.workoutHeartRate || options.allDayHeartRate
-            RESTING_HR, BODY_MASS -> options.restingHrAndWeight
-            STEP_COUNT, SLEEP -> options.stepsAndSleep
-            else -> false
-        }
-        if (!wanted) return
+        val spec = AppleTypes.specs[type] ?: return // HRV 등 모르는 종류는 옮기지 않음
+        if (!AppleTypes.enabled(spec.category, options)) return
         val source = p.attr("sourceName")
         val fromWatch = isWatch(source, p.attr("device"))
-        if (options.watchOnly && !fromWatch && type != BODY_MASS) return
+        if (options.watchOnly && !fromWatch && !spec.anySource) return
         val start = p.attr("startDate")?.let { runCatching { AppleDates.parse(it) }.getOrNull() } ?: return
         val end = p.attr("endDate")?.let { runCatching { AppleDates.parse(it) }.getOrNull() } ?: return
         if (options.from != null && end.instant < options.from) return
         if (options.to != null && start.instant > options.to) return
         val value = p.attr("value") ?: return
+        if (spec.skipInsideWorkout && workoutAt(start) != null) return
 
         when (type) {
             HEART_RATE -> {

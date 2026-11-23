@@ -1,6 +1,24 @@
 package com.minjun.healthbridge.hc
 
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.BloodGlucoseRecord
+import androidx.health.connect.client.records.BloodPressureRecord
+import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.BodyTemperatureMeasurementLocation
+import androidx.health.connect.client.records.BodyTemperatureRecord
+import androidx.health.connect.client.records.FloorsClimbedRecord
+import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.HydrationRecord
+import androidx.health.connect.client.records.LeanBodyMassRecord
+import androidx.health.connect.client.records.MealType
+import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.RespiratoryRateRecord
+import androidx.health.connect.client.records.Vo2MaxRecord
+import androidx.health.connect.client.units.BloodGlucose
+import androidx.health.connect.client.units.Percentage
+import androidx.health.connect.client.units.Pressure
+import androidx.health.connect.client.units.Temperature
+import androidx.health.connect.client.units.Volume
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseRoute
 import androidx.health.connect.client.records.ExerciseSessionRecord
@@ -126,23 +144,68 @@ object RecordFactory {
     }
 
     fun quantity(s: QuantitySample): Record? {
-        val id = RecordIds.forSample(s.type.removePrefix("HKQuantityTypeIdentifier").lowercase(), s.start.instant, s.end.instant, "q")
+        val kind = s.type.removePrefix("HKQuantityTypeIdentifier").lowercase()
+        val id = RecordIds.forSample(kind, s.start.instant, s.end.instant, "q")
         val m = meta(id, s.isFromWatch)
-        return when (s.type) {
-            "HKQuantityTypeIdentifierRestingHeartRate" ->
-                RestingHeartRateRecord(s.start.instant, s.start.offset, s.value.roundToLong().coerceIn(1, 300), m)
-            "HKQuantityTypeIdentifierBodyMass" -> {
+        val t = s.start.instant; val o = s.start.offset
+        val interval = s.start.instant.isBefore(s.end.instant)
+        fun pct(v: Double) = Percentage(if (v <= 1.0) v * 100.0 else v)
+        return when (s.type.removePrefix("HKQuantityTypeIdentifier")) {
+            "RestingHeartRate" -> RestingHeartRateRecord(t, o, s.value.roundToLong().coerceIn(1, 300), m)
+            "BodyMass" -> {
                 val kg = when (s.unit) { "lb" -> s.value * 0.45359237; "g" -> s.value / 1000.0; else -> s.value }
-                if (kg in 0.1..1000.0) WeightRecord(s.start.instant, s.start.offset, Mass.kilograms(kg), m) else null
+                if (kg in 0.1..1000.0) WeightRecord(t, o, Mass.kilograms(kg), m) else null
             }
-            "HKQuantityTypeIdentifierStepCount" -> {
+            "LeanBodyMass" -> {
+                val kg = when (s.unit) { "lb" -> s.value * 0.45359237; "g" -> s.value / 1000.0; else -> s.value }
+                if (kg in 0.1..1000.0) LeanBodyMassRecord(t, o, Mass.kilograms(kg), m) else null
+            }
+            "Height" -> {
+                val meters = when (s.unit) { "cm" -> s.value / 100.0; "ft" -> s.value * 0.3048; "in" -> s.value * 0.0254; else -> s.value }
+                if (meters in 0.3..3.0) HeightRecord(t, o, Length.meters(meters), m) else null
+            }
+            "BodyFatPercentage" -> BodyFatRecord(t, o, pct(s.value), m)
+            "OxygenSaturation" -> OxygenSaturationRecord(t, o, pct(s.value), m)
+            "RespiratoryRate" -> RespiratoryRateRecord(t, o, s.value, m)
+            "VO2Max" -> Vo2MaxRecord(t, o, m, s.value, Vo2MaxRecord.MEASUREMENT_METHOD_OTHER)
+            "BodyTemperature" -> {
+                val c = if (s.unit == "degF") (s.value - 32) * 5 / 9 else s.value
+                BodyTemperatureRecord(t, o, m, Temperature.celsius(c), BodyTemperatureMeasurementLocation.MEASUREMENT_LOCATION_UNKNOWN)
+            }
+            "BloodGlucose" -> {
+                val level = if (s.unit.startsWith("mmol")) BloodGlucose.millimolesPerLiter(s.value) else BloodGlucose.milligramsPerDeciliter(s.value)
+                BloodGlucoseRecord(t, o, m, level, BloodGlucoseRecord.SPECIMEN_SOURCE_UNKNOWN, MealType.MEAL_TYPE_UNKNOWN, BloodGlucoseRecord.RELATION_TO_MEAL_UNKNOWN)
+            }
+            "StepCount" -> {
                 val count = s.value.roundToLong()
-                if (count < 1 || !s.start.instant.isBefore(s.end.instant)) null
-                else StepsRecord(s.start.instant, s.start.offset, s.end.instant, s.end.offset, count, m)
+                if (count < 1 || !interval) null else StepsRecord(t, o, s.end.instant, s.end.offset, count, m)
+            }
+            "DistanceWalkingRunning" -> {
+                val meters = when (s.unit) { "km" -> s.value * 1000; "mi" -> s.value * 1609.344; else -> s.value }
+                if (meters <= 0 || !interval) null else DistanceRecord(t, o, s.end.instant, s.end.offset, Length.meters(meters), m)
+            }
+            "ActiveEnergyBurned" -> {
+                val kcal = when (s.unit) { "kJ" -> s.value / 4.184; else -> s.value }
+                if (kcal <= 0 || !interval) null else ActiveCaloriesBurnedRecord(t, o, s.end.instant, s.end.offset, Energy.kilocalories(kcal), m)
+            }
+            "FlightsClimbed" -> if (s.value <= 0 || !interval) null else FloorsClimbedRecord(t, o, s.end.instant, s.end.offset, s.value, m)
+            "DietaryWater" -> {
+                val ml = when (s.unit) { "L" -> s.value * 1000; "fl_oz_us" -> s.value * 29.5735; else -> s.value }
+                val end = if (interval) s.end.instant else t.plusSeconds(1)
+                if (ml <= 0) null else HydrationRecord(t, o, end, s.end.offset, Volume.milliliters(ml), m)
             }
             else -> null
         }
     }
+
+    /** 같은 시각의 수축기·이완기를 하나의 혈압 기록으로 */
+    fun bloodPressure(systolic: QuantitySample, diastolic: QuantitySample): Record =
+        BloodPressureRecord(
+            systolic.start.instant, systolic.start.offset,
+            meta(RecordIds.forSample("bloodpressure", systolic.start.instant, systolic.end.instant, "q"), false),
+            Pressure.millimetersOfMercury(systolic.value), Pressure.millimetersOfMercury(diastolic.value),
+            BloodPressureRecord.BODY_POSITION_UNKNOWN, BloodPressureRecord.MEASUREMENT_LOCATION_UNKNOWN,
+        )
 
     /**
      * 수면: 출처별로 정리(중복 제거, 단계가 있으면 '침대에 있음' 제외, 겹치는 구간 잘라내기)한 뒤

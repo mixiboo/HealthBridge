@@ -118,7 +118,7 @@ class ImportPipelineTest {
     @Test fun optional_records_written_when_enabled() = runTest {
         val w = FakeWriter()
         ImportPipeline(reader, w) { emptySet() }
-            .run(ImportOptions(allDayHeartRate = true, restingHrAndWeight = true, stepsAndSleep = true)) {}
+            .run(ImportOptions(allDayHeartRate = true, vitals = true, body = true, activity = true, sleep = true)) {}
         val kinds = w.written.map { it::class.simpleName }.toSet()
         assertTrue(kinds.toString(), kinds.containsAll(setOf("WeightRecord", "RestingHeartRateRecord", "StepsRecord", "SleepSessionRecord")))
         assertEquals(3, w.written.filterIsInstance<HeartRateRecord>().sumOf { it.samples.size }) // 운동 1 + 하루 2

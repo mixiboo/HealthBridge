@@ -52,7 +52,7 @@ class HealthXmlParserRecordTest {
     }
 
     @Test fun hrv_never_emitted() {
-        val c = run(ImportOptions(allDayHeartRate = true, restingHrAndWeight = true, stepsAndSleep = true, watchOnly = false))
+        val c = run(ImportOptions(allDayHeartRate = true, vitals = true, body = true, activity = true, sleep = true, watchOnly = false))
         assertTrue(c.quantity.none { it.type.contains("Variability") })
         assertTrue(c.allDay.none { it.bpm == 45L })
     }
@@ -62,14 +62,14 @@ class HealthXmlParserRecordTest {
         assertTrue(off.quantity.isEmpty())
         assertTrue(off.sleep.isEmpty())
 
-        val rw = run(ImportOptions(restingHrAndWeight = true))
+        val rw = run(ImportOptions(vitals = true, body = true))
         assertEquals(
             setOf("HKQuantityTypeIdentifierRestingHeartRate", "HKQuantityTypeIdentifierBodyMass"),
             rw.quantity.map { it.type }.toSet(),
         )
         assertTrue(rw.sleep.isEmpty())
 
-        val ss = run(ImportOptions(stepsAndSleep = true))
+        val ss = run(ImportOptions(activity = true, sleep = true))
         assertEquals(setOf("HKQuantityTypeIdentifierStepCount"), ss.quantity.map { it.type }.toSet())
         assertEquals("HKCategoryValueSleepAnalysisAsleepDeep", ss.sleep.single().value)
     }
@@ -86,7 +86,7 @@ class HealthXmlParserRecordTest {
         assertTrue(watch.workoutHeart.none { it.second.bpm == 99L })
         val all = run(ImportOptions(watchOnly = false))
         assertTrue(all.workoutHeart.any { it.second.bpm == 99L })
-        val weight = run(ImportOptions(restingHrAndWeight = true, watchOnly = true))
+        val weight = run(ImportOptions(vitals = true, body = true, watchOnly = true))
         assertEquals(68.5, weight.quantity.single { it.type.endsWith("BodyMass") }.value, 1e-9)
     }
 

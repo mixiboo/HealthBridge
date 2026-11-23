@@ -52,7 +52,7 @@ class ImportViewModel(private val app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state
     private val work = WorkManager.getInstance(app)
 
-    fun open(uri: Uri, options: ImportOptions = ImportOptions(), name: String? = null, size: Long? = null) {
+    fun open(uri: Uri, options: ImportOptions = ImportOptions.ALL, name: String? = null, size: Long? = null) {
         _state.value = UiState.Reading
         selectTab(Tab.Transfer)
         val (fileName, fileSize) = if (name != null && size != null) name to size else fileInfo(uri)
@@ -88,8 +88,19 @@ class ImportViewModel(private val app: Application) : AndroidViewModel(app) {
                     java.io.File(app.cacheDir, "existing-ids.txt").apply { writeText(ids.joinToString("\n")) }.path
                 }.getOrNull()
             }
+            // 갤럭시워치(Samsung Health) 기록이 있는 날도 화면에 있을 때 미리 읽는다
+            val occupiedFile = if (!s.options.avoidGalaxyOverlap) null else withContext(Dispatchers.IO) {
+                runCatching {
+                    val app = getApplication<Application>()
+                    val zone = java.time.ZoneId.systemDefault()
+                    val from = (s.options.from ?: s.scan.firstDate ?: java.time.Instant.now()).atZone(zone).toLocalDate().minusDays(1)
+                    val to = (s.options.to ?: java.time.Instant.now()).atZone(zone).toLocalDate().plusDays(1)
+                    val days = com.minjun.healthbridge.hc.GalaxyDays.read(androidx.health.connect.client.HealthConnectClient.getOrCreate(app), from, to)
+                    java.io.File(app.cacheDir, "occupied-days.txt").apply { com.minjun.healthbridge.importer.OccupiedDaysFile.write(this, days) }.path
+                }.getOrNull()
+            }
             val request = OneTimeWorkRequestBuilder<ImportWorker>()
-                .setInputData(ImportWorker.inputFor(s.uri, s.options, idsFile, s.fileName, s.fileSize))
+                .setInputData(ImportWorker.inputFor(s.uri, s.options, idsFile, s.fileName, s.fileSize, occupiedFile))
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
             work.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)

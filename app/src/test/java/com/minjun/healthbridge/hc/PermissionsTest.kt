@@ -32,7 +32,7 @@ class PermissionsTest {
     }
 
     @Test fun optional_types_add_permissions() {
-        val p = Permissions.forOptions(ImportOptions(stepsAndSleep = true, restingHrAndWeight = true, routes = false))
+        val p = Permissions.forOptions(ImportOptions(activity = true, sleep = true, vitals = true, body = true, routes = false))
         assertTrue(p.contains(HealthPermission.getWritePermission(StepsRecord::class)))
         assertTrue(p.contains(HealthPermission.getWritePermission(SleepSessionRecord::class)))
         assertTrue(p.contains(HealthPermission.getWritePermission(WeightRecord::class)))

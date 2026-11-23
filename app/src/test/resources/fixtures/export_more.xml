@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HealthData locale="ko_KR">
+ <Record type="HKQuantityTypeIdentifierOxygenSaturation" sourceName="민준의 Apple Watch" unit="%" startDate="2025-03-01 03:00:00 +0900" endDate="2025-03-01 03:00:00 +0900" value="0.97"/>
+ <Record type="HKQuantityTypeIdentifierRespiratoryRate" sourceName="민준의 Apple Watch" unit="count/min" startDate="2025-03-01 03:10:00 +0900" endDate="2025-03-01 03:10:00 +0900" value="14.5"/>
+ <Record type="HKQuantityTypeIdentifierVO2Max" sourceName="민준의 Apple Watch" unit="mL/min·kg" startDate="2025-03-01 18:00:00 +0900" endDate="2025-03-01 18:00:00 +0900" value="45.2"/>
+ <Record type="HKQuantityTypeIdentifierBodyTemperature" sourceName="체온계" unit="degC" startDate="2025-03-01 08:00:00 +0900" endDate="2025-03-01 08:00:00 +0900" value="36.6"/>
+ <Record type="HKQuantityTypeIdentifierBloodPressureSystolic" sourceName="혈압계" unit="mmHg" startDate="2025-03-01 08:05:00 +0900" endDate="2025-03-01 08:05:00 +0900" value="118"/>
+ <Record type="HKQuantityTypeIdentifierBloodPressureDiastolic" sourceName="혈압계" unit="mmHg" startDate="2025-03-01 08:05:00 +0900" endDate="2025-03-01 08:05:00 +0900" value="76"/>
+ <Record type="HKQuantityTypeIdentifierBloodPressureSystolic" sourceName="혈압계" unit="mmHg" startDate="2025-03-01 09:00:00 +0900" endDate="2025-03-01 09:00:00 +0900" value="121"/>
+ <Record type="HKQuantityTypeIdentifierBloodGlucose" sourceName="혈당계" unit="mg/dL" startDate="2025-03-01 08:10:00 +0900" endDate="2025-03-01 08:10:00 +0900" value="95"/>
+ <Record type="HKQuantityTypeIdentifierHeight" sourceName="건강" unit="cm" startDate="2025-03-01 08:00:00 +0900" endDate="2025-03-01 08:00:00 +0900" value="175"/>
+ <Record type="HKQuantityTypeIdentifierBodyFatPercentage" sourceName="체중계" unit="%" startDate="2025-03-01 08:00:00 +0900" endDate="2025-03-01 08:00:00 +0900" value="0.18"/>
+ <Record type="HKQuantityTypeIdentifierLeanBodyMass" sourceName="체중계" unit="kg" startDate="2025-03-01 08:00:00 +0900" endDate="2025-03-01 08:00:00 +0900" value="56.1"/>
+ <Record type="HKQuantityTypeIdentifierDietaryWater" sourceName="물마시기" unit="mL" startDate="2025-03-01 10:00:00 +0900" endDate="2025-03-01 10:00:01 +0900" value="250"/>
+ <Record type="HKQuantityTypeIdentifierFlightsClimbed" sourceName="민준의 Apple Watch" unit="count" startDate="2025-03-01 11:00:00 +0900" endDate="2025-03-01 11:05:00 +0900" value="3"/>
+ <Record type="HKQuantityTypeIdentifierDistanceWalkingRunning" sourceName="민준의 Apple Watch" unit="km" startDate="2025-03-01 12:00:00 +0900" endDate="2025-03-01 12:10:00 +0900" value="0.8"/>
+ <Record type="HKQuantityTypeIdentifierDistanceWalkingRunning" sourceName="민준의 Apple Watch" unit="km" startDate="2025-03-01 19:05:00 +0900" endDate="2025-03-01 19:10:00 +0900" value="0.9"/>
+ <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="민준의 Apple Watch" unit="kcal" startDate="2025-03-01 12:00:00 +0900" endDate="2025-03-01 12:10:00 +0900" value="40"/>
+ <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="민준의 Apple Watch" unit="kcal" startDate="2025-03-01 19:05:00 +0900" endDate="2025-03-01 19:10:00 +0900" value="55"/>
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="민준의 Apple Watch" unit="count" startDate="2025-03-01 12:00:00 +0900" endDate="2025-03-01 12:10:00 +0900" value="900"/>
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="민준의 Apple Watch" unit="count" startDate="2025-03-02 12:00:00 +0900" endDate="2025-03-02 12:10:00 +0900" value="700"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="민준의 Apple Watch" unit="count/min" startDate="2025-03-01 13:00:00 +0900" endDate="2025-03-01 13:00:00 +0900" value="72"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="민준의 Apple Watch" unit="count/min" startDate="2025-03-02 13:00:00 +0900" endDate="2025-03-02 13:00:00 +0900" value="74"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="민준의 Apple Watch" startDate="2025-03-01 01:00:00 +0900" endDate="2025-03-01 02:00:00 +0900" value="HKCategoryValueSleepAnalysisAsleepDeep"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="민준의 Apple Watch" startDate="2025-03-02 01:00:00 +0900" endDate="2025-03-02 02:00:00 +0900" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+ <Workout workoutActivityType="HKWorkoutActivityTypeRunning" sourceName="민준의 Apple Watch" startDate="2025-03-01 19:00:00 +0900" endDate="2025-03-01 19:30:00 +0900">
+  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned" sum="300" unit="kcal"/>
+ </Workout>
+</HealthData>
