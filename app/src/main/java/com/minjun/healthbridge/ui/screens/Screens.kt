@@ -2,8 +2,11 @@ package com.minjun.healthbridge.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -11,21 +14,34 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.minjun.healthbridge.importer.ImportPreview
+import com.minjun.healthbridge.BuildConfig
 import com.minjun.healthbridge.importer.ImportProgress
 import com.minjun.healthbridge.importer.ImportReport
 import com.minjun.healthbridge.model.ImportOptions
+import com.minjun.healthbridge.model.ScanSummary
+import com.minjun.healthbridge.ui.Labels
+import com.minjun.healthbridge.ui.UpdateState
 import com.minjun.healthbridge.ui.theme.GlassCard
 import com.minjun.healthbridge.ui.theme.HbShapes
 import com.minjun.healthbridge.ui.theme.OptionChip
@@ -33,210 +49,282 @@ import com.minjun.healthbridge.ui.theme.PrimaryButton
 import com.minjun.healthbridge.ui.theme.ScreenHeader
 import com.minjun.healthbridge.ui.theme.SecondaryButton
 import com.minjun.healthbridge.ui.theme.StatLine
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 private val dateFmt = DateTimeFormatter.ofPattern("yyyy.MM.dd").withZone(ZoneId.systemDefault())
+private fun n(v: Int): String = NumberFormat.getIntegerInstance().format(v)
 
+/** 탭 공통 스크롤 화면 (아래 유리 하단바 자리만큼 여백) */
 @Composable
 fun Page(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) { content() }
 }
 
 @Composable
-private fun Muted(text: String) =
+fun MutedPublic(text: String) =
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
 @Composable
-private fun SectionTitle(text: String) =
-    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(top = 6.dp))
+fun SectionTitlePublic(text: String) =
+    Text(text, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 6.dp))
 
 @Composable
-private fun Step(n: Int, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        androidx.compose.material3.Surface(
-            shape = RoundedCornerShape(HbShapes.chip),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-        ) {
-            Text("$n", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
-        }
-        Spacer(Modifier.padding(start = 10.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-fun PickScreen(
-    onPick: () -> Unit, onSample: () -> Unit, sampleMessage: String?,
-    update: com.minjun.healthbridge.ui.UpdateState, onUpdate: () -> Unit, onCheckUpdate: () -> Unit,
-) = Page {
-    ScreenHeader("민준의 기록,", "애플워치로 남긴 운동을 Samsung Health로 옮겨요.")
-    UpdateBanner(update, onUpdate)
-    GlassCard {
-        Text("⌚ → 💚  이렇게 옮겨요", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-        Step(1, "아이폰 건강 앱 → 오른쪽 위 프로필")
-        Step(2, "'모든 건강 데이터 내보내기'")
-        Step(3, "만들어진 zip을 이 폰으로 보내기")
-        Step(4, "아래에서 고르거나, 파일 앱에서 '헬스 브릿지로 열기'")
-    }
-    PrimaryButton("📦 내보내기 zip 고르기", onPick)
-    SecondaryButton("🧪 샘플 운동 넣어보기", onSample)
-    if (sampleMessage != null) GlassCard { Text(sampleMessage, style = MaterialTheme.typography.bodyMedium) }
-    Muted("🔒 건강 데이터는 폰 밖으로 보내지 않아요. 인터넷은 업데이트 확인에만 써요.")
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Muted("버전 ${com.minjun.healthbridge.BuildConfig.VERSION_NAME}")
-        Spacer(Modifier.weight(1f))
-        androidx.compose.material3.TextButton(onClick = onCheckUpdate) {
-            Text(
-                when (update) {
-                    com.minjun.healthbridge.ui.UpdateState.Checking -> "확인하는 중…"
-                    com.minjun.healthbridge.ui.UpdateState.UpToDate -> "최신 버전이에요 ✓"
-                    else -> "업데이트 확인"
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun UpdateBanner(update: com.minjun.healthbridge.ui.UpdateState, onUpdate: () -> Unit) {
+fun UpdateBannerPublic(update: UpdateState, onUpdate: () -> Unit) {
     when (update) {
-        is com.minjun.healthbridge.ui.UpdateState.Available -> GlassCard {
+        is UpdateState.Available -> GlassCard {
             Text("✨ 새 버전 ${update.info.version}이 있어요", style = MaterialTheme.typography.titleMedium)
-            if (update.info.notes.isNotBlank()) Muted(update.info.notes.lines().take(4).joinToString("\n"))
+            if (update.info.notes.isNotBlank()) MutedPublic(update.info.notes.lines().take(4).joinToString("\n"))
             SecondaryButton("업데이트하기", onUpdate)
         }
-        is com.minjun.healthbridge.ui.UpdateState.Downloading -> GlassCard {
+        is UpdateState.Downloading -> GlassCard {
             Text("새 버전 ${update.info.version} 받는 중", style = MaterialTheme.typography.titleMedium)
             LinearProgressIndicator(progress = { update.progress }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
         }
-        is com.minjun.healthbridge.ui.UpdateState.NeedsPermission -> GlassCard {
+        is UpdateState.NeedsPermission -> GlassCard {
             Text("설치 권한이 필요해요", style = MaterialTheme.typography.titleMedium)
-            Muted("방금 열린 화면에서 '이 출처 허용'을 켠 뒤 돌아와서 다시 눌러 주세요.")
+            MutedPublic("방금 열린 화면에서 '이 출처 허용'을 켠 뒤 돌아와서 다시 눌러 주세요.")
             SecondaryButton("다시 업데이트하기", onUpdate)
         }
-        is com.minjun.healthbridge.ui.UpdateState.Failed -> GlassCard { Muted(update.message) }
+        is UpdateState.Failed -> GlassCard { MutedPublic(update.message) }
         else -> Unit
     }
 }
 
 @Composable
-fun ReadingScreen() = Page {
-    ScreenHeader("파일을 읽고 있어요", "큰 파일은 1~2분 걸릴 수 있어요.")
+fun VersionRow(update: UpdateState, onCheckUpdate: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        MutedPublic("버전 ${BuildConfig.VERSION_NAME} · 🔒 건강 데이터는 폰 밖으로 보내지 않아요")
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick = onCheckUpdate) {
+            Text(when (update) { UpdateState.Checking -> "확인 중…"; UpdateState.UpToDate -> "최신 ✓"; else -> "업데이트 확인" })
+        }
+    }
+}
+
+// ───────────────────────── 옮기기 탭 ─────────────────────────
+
+@Composable
+fun PickContent(onPick: () -> Unit) = Page {
+    ScreenHeader("무엇을 옮길까요? 📦", "아이폰에서 내보낸 zip을 골라 주세요.")
+    GlassCard {
+        Text("📄 아직 고른 파일이 없어요", style = MaterialTheme.typography.titleMedium)
+        MutedPublic("건강 앱 → 프로필 → '모든 건강 데이터 내보내기'로 만든 zip이에요. 파일 앱에서 '헬스 브릿지로 열기'를 해도 돼요.")
+    }
+    PrimaryButton("📦 내보내기 zip 고르기", onPick)
+    GlassCard {
+        Text("고르고 나면 이런 걸 할 수 있어요", style = MaterialTheme.typography.titleMedium)
+        MutedPublic("• 항목마다 몇 개 들어있는지 미리 보기\n• 옮길 데이터와 운동 종류 고르기\n• 기간을 전체 · 1년 · 30일 · 직접 정하기\n• 이미 옮긴 운동은 건너뛰거나 다시 채우기")
+    }
+}
+
+@Composable
+fun ReadingContent() = Page {
+    ScreenHeader("파일을 훑어보고 있어요", "항목마다 몇 개 들어있는지 세는 중이에요. 큰 파일은 1~2분 걸려요.")
     GlassCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             CircularProgressIndicator(strokeWidth = 3.dp)
-            Text("운동 기록을 하나씩 찾는 중 ⏳", style = MaterialTheme.typography.bodyMedium)
+            Text("운동·심박·수면 기록을 세는 중 ⏳", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
+
+private enum class Preset(val label: String) { RECOMMENDED("추천"), WORKOUT_ONLY("운동만"), ALL("전부") }
+
+private fun ImportOptions.apply(p: Preset): ImportOptions = when (p) {
+    Preset.RECOMMENDED -> copy(workouts = true, workoutHeartRate = true, routes = true, allDayHeartRate = false, restingHrAndWeight = false, stepsAndSleep = false)
+    Preset.WORKOUT_ONLY -> copy(workouts = true, workoutHeartRate = false, routes = false, allDayHeartRate = false, restingHrAndWeight = false, stepsAndSleep = false)
+    Preset.ALL -> copy(workouts = true, workoutHeartRate = true, routes = true, allDayHeartRate = true, restingHrAndWeight = true, stepsAndSleep = true)
+}
+
+private fun ImportOptions.preset(): Preset? = Preset.entries.firstOrNull { apply(it) == this }
 
 private enum class Range(val label: String, val days: Long?) { ALL("전체", null), YEAR("최근 1년", 365), MONTH("최근 30일", 30) }
 
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun PreviewScreen(preview: ImportPreview, options: ImportOptions, onChange: (ImportOptions) -> Unit, onStart: () -> Unit, onCancel: () -> Unit) = Page {
-    ScreenHeader("이렇게 옮길게요 👀", "기간과 항목을 고른 뒤 시작해 주세요.")
-    GlassCard {
-        StatLine("${preview.workoutCount}", "개 운동", emphasize = true)
-        if (preview.firstDate != null && preview.lastDate != null) {
-            Muted("${dateFmt.format(preview.firstDate)} ~ ${dateFmt.format(preview.lastDate)}")
-        }
-        Muted("경로(GPS)가 있는 운동 ${preview.routeCount}개")
-    }
-    if (preview.workoutCount == 0) Muted("운동을 찾지 못했어요. 아래 '애플워치 기록만'을 끄고 다시 확인해 보세요.")
-
-    SectionTitle("기간")
-    val current = Range.entries.firstOrNull { r ->
-        if (r.days == null) options.from == null else options.from != null &&
-            ChronoUnit.DAYS.between(options.from, Instant.now()) in (r.days - 1)..(r.days + 1)
-    } ?: Range.ALL
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Range.entries.forEach { r ->
-            FilterChip(
-                selected = r == current,
-                onClick = { onChange(options.copy(from = r.days?.let { Instant.now().minus(it, ChronoUnit.DAYS) })) },
-                label = { Text(r.label) },
-                shape = RoundedCornerShape(HbShapes.chip),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                ),
-            )
-        }
-    }
-
-    SectionTitle("옮길 항목")
-    OptionChip("운동 기록", options.workouts, { onChange(options.copy(workouts = it)) }, "종류 · 시간 · 거리 · 칼로리")
-    OptionChip("운동 중 심박수 💓", options.workoutHeartRate, { onChange(options.copy(workoutHeartRate = it)) }, "평균 · 최대 · 차트 · 심박 구간")
-    OptionChip("운동 경로 (GPS)", options.routes, { onChange(options.copy(routes = it)) }, "Health Connect에 저장돼요 (Samsung Health 지도에는 안 보여요)")
-    OptionChip("하루 전체 심박수", options.allDayHeartRate, { onChange(options.copy(allDayHeartRate = it)) }, "데이터가 많아서 시간이 걸려요")
-    OptionChip("안정 시 심박수 · 체중", options.restingHrAndWeight, { onChange(options.copy(restingHrAndWeight = it)) })
-    OptionChip("걸음 수 · 수면", options.stepsAndSleep, { onChange(options.copy(stepsAndSleep = it)) },
-        if (options.stepsAndSleep) "갤럭시워치와 같이 차면 두 번 기록될 수 있어요." else null)
-    OptionChip("이미 옮긴 운동도 다시 쓰기", options.rewriteExisting, { onChange(options.copy(rewriteExisting = it)) }, "빠진 심박·칼로리를 채울 때 켜요. 중복은 생기지 않아요.")
-
-    GlassCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("애플워치 기록만", style = MaterialTheme.typography.titleMedium)
-                Muted("끄면 아이폰·다른 앱 기록도 함께 옮겨요.")
-            }
-            Switch(checked = options.watchOnly, onCheckedChange = { onChange(options.copy(watchOnly = it)) })
-        }
-    }
-    Muted("HRV(심박 변이도)는 애플과 삼성의 계산 방식이 달라서 옮기지 않아요.")
-    Spacer(Modifier.height(4.dp))
-    PrimaryButton(
-        "옮기기 시작하기 🚀", onStart,
-        enabled = preview.workoutCount > 0 || options.allDayHeartRate || options.restingHrAndWeight || options.stepsAndSleep,
+fun PreviewContent(
+    fileName: String, fileSize: Long, scan: ScanSummary, options: ImportOptions,
+    onChange: (ImportOptions) -> Unit, onStart: () -> Unit, onOtherFile: () -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
     )
-    SecondaryButton("다른 파일 고르기", onCancel)
+    val selectedTypes = options.workoutTypes ?: scan.workoutTypes.keys
+    val chosenWorkouts = scan.workoutTypes.filterKeys { it in selectedTypes }.values.sum()
+
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // 파일 카드
+            GlassCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("📄 $fileName", style = MaterialTheme.typography.titleMedium)
+                        MutedPublic(listOfNotNull(
+                            fileSize.takeIf { it > 0 }?.let(Labels::size),
+                            if (scan.firstDate != null && scan.lastDate != null) "${dateFmt.format(scan.firstDate)} ~ ${dateFmt.format(scan.lastDate)}" else null,
+                        ).joinToString(" · "))
+                    }
+                    TextButton(onClick = onOtherFile) { Text("다른 파일") }
+                }
+                StatLine(n(scan.workoutCount), "개 운동", emphasize = true)
+                if (scan.workoutCount == 0) MutedPublic("운동을 찾지 못했어요. 아래 고급에서 '애플워치 기록만'을 꺼 보세요.")
+            }
+
+            // 빠른 선택
+            SectionTitlePublic("⚡ 빠른 선택")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Preset.entries.forEach { p ->
+                    FilterChip(selected = options.preset() == p, onClick = { onChange(options.apply(p)) }, label = { Text(p.label) },
+                        shape = RoundedCornerShape(HbShapes.chip), colors = chipColors)
+                }
+            }
+
+            // 옮길 데이터
+            SectionTitlePublic("📊 옮길 데이터")
+            OptionChip("운동 기록", options.workouts, { onChange(options.copy(workouts = it)) }, "${n(scan.workoutCount)}개 · 종류·시간·거리·칼로리")
+            OptionChip("운동 중 심박수 💓", options.workoutHeartRate, { onChange(options.copy(workoutHeartRate = it)) }, "평균·최대·차트·심박 구간")
+            OptionChip("운동 경로 (GPS)", options.routes, { onChange(options.copy(routes = it)) }, "${n(scan.routeCount)}개 운동 · Samsung Health 지도에는 안 보여요")
+            OptionChip("하루 전체 심박수", options.allDayHeartRate, { onChange(options.copy(allDayHeartRate = it)) }, "측정 ${n(scan.heartRate)}개 · 시간이 조금 걸려요")
+            OptionChip("안정 시 심박수 · 체중", options.restingHrAndWeight, { onChange(options.copy(restingHrAndWeight = it)) }, "안정 시 심박 ${n(scan.restingHeartRate)}개 · 체중 ${n(scan.weight)}개")
+            OptionChip("걸음 수 · 수면", options.stepsAndSleep, { onChange(options.copy(stepsAndSleep = it)) },
+                "걸음 ${n(scan.steps)}개 · 수면 ${n(scan.sleep)}개" + if (options.stepsAndSleep) "\n갤럭시워치와 같이 차면 두 번 기록될 수 있어요." else "")
+
+            // 운동 종류
+            if (scan.workoutTypes.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitlePublic("🏃 운동 종류")
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { onChange(options.copy(workoutTypes = null)) }) { Text("모두") }
+                    TextButton(onClick = { onChange(options.copy(workoutTypes = emptySet())) }) { Text("비우기") }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    scan.workoutTypes.entries.sortedByDescending { it.value }.forEach { (type, count) ->
+                        val on = type in selectedTypes
+                        FilterChip(
+                            selected = on,
+                            onClick = {
+                                val next = if (on) selectedTypes - type else selectedTypes + type
+                                onChange(options.copy(workoutTypes = if (next == scan.workoutTypes.keys) null else next))
+                            },
+                            label = { Text("${Labels.workout(type)} $count") },
+                            shape = RoundedCornerShape(HbShapes.chip), colors = chipColors,
+                        )
+                    }
+                }
+            }
+
+            // 기간
+            SectionTitlePublic("📅 기간")
+            val custom = options.to != null
+            val current = if (custom) null else Range.entries.firstOrNull { r ->
+                if (r.days == null) options.from == null else options.from != null &&
+                    ChronoUnit.DAYS.between(options.from, Instant.now()) in (r.days - 1)..(r.days + 1)
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Range.entries.forEach { r ->
+                    FilterChip(selected = r == current, onClick = {
+                        onChange(options.copy(from = r.days?.let { Instant.now().minus(it, ChronoUnit.DAYS) }, to = null))
+                    }, label = { Text(r.label) }, shape = RoundedCornerShape(HbShapes.chip), colors = chipColors)
+                }
+                FilterChip(selected = custom, onClick = { showPicker = true }, label = { Text("직접 고르기") },
+                    shape = RoundedCornerShape(HbShapes.chip), colors = chipColors)
+            }
+            if (custom && options.from != null) MutedPublic("${dateFmt.format(options.from)} ~ ${dateFmt.format(options.to)}")
+
+            // 고급
+            SectionTitlePublic("⚙️ 고급")
+            GlassCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("애플워치 기록만", style = MaterialTheme.typography.titleMedium)
+                        MutedPublic("끄면 아이폰·다른 앱 기록도 함께 옮겨요.")
+                    }
+                    Switch(checked = options.watchOnly, onCheckedChange = { onChange(options.copy(watchOnly = it)) })
+                }
+            }
+            OptionChip("이미 옮긴 운동도 다시 쓰기", options.rewriteExisting, { onChange(options.copy(rewriteExisting = it)) }, "빠진 심박·칼로리를 채울 때 켜요. 중복은 생기지 않아요.")
+            MutedPublic("HRV(심박 변이도)는 애플과 삼성의 계산 방식이 달라서 옮기지 않아요.")
+        }
+
+        // 하단 고정: 요약 + 시작 버튼
+        Surface(color = androidx.compose.ui.graphics.Color.Transparent) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 104.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                MutedPublic(if (options.workouts) "운동 ${n(chosenWorkouts)}개를 옮겨요 (기간에 따라 줄어들 수 있어요)" else "운동 기록은 옮기지 않아요")
+                PrimaryButton(
+                    "옮기기 시작하기 🚀", onStart,
+                    enabled = (options.workouts && chosenWorkouts > 0) || options.allDayHeartRate || options.restingHrAndWeight || options.stepsAndSleep,
+                )
+            }
+        }
+    }
+
+    if (showPicker) {
+        val state = rememberDateRangePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(enabled = state.selectedStartDateMillis != null, onClick = {
+                    val s = state.selectedStartDateMillis!!
+                    val e = (state.selectedEndDateMillis ?: s) + 86_400_000L - 1
+                    onChange(options.copy(from = Instant.ofEpochMilli(s), to = Instant.ofEpochMilli(e)))
+                    showPicker = false
+                }) { Text("이 기간으로") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("취소") } },
+        ) {
+            DateRangePicker(state = state, modifier = Modifier.height(460.dp), title = { Text("기간 고르기", Modifier.padding(16.dp)) })
+        }
+    }
 }
 
 @Composable
-fun ProgressScreen(p: ImportProgress) = Page {
-    ScreenHeader("옮기고 있어요 🏃", "화면을 끄거나 다른 앱을 써도 계속 진행돼요.")
+fun ProgressContent(p: ImportProgress) = Page {
+    ScreenHeader("옮기고 있어요 🏃", "화면을 끄거나 다른 탭을 봐도 계속 진행돼요.")
     GlassCard {
         Text(p.phase, style = MaterialTheme.typography.titleMedium)
         if (p.total > 0) {
             StatLine("${p.done}", "/ ${p.total}개 운동", emphasize = true)
-            LinearProgressIndicator(
-                progress = { p.done.toFloat() / p.total },
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
-            )
+            LinearProgressIndicator(progress = { p.done.toFloat() / p.total }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
         } else {
             LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
         }
     }
-    Muted("알림에서도 진행 상황을 볼 수 있어요.")
+    MutedPublic("알림에서도 진행 상황을 볼 수 있어요. 끝나면 기록 탭에 남아요.")
 }
 
 @Composable
-fun DoneScreen(r: ImportReport, onOpenSamsungHealth: () -> Unit, onAgain: () -> Unit) = Page {
+fun DoneContent(r: ImportReport, onOpenSamsungHealth: () -> Unit, onHistory: () -> Unit, onAgain: () -> Unit) = Page {
     ScreenHeader("다 옮겼어요! 🎉", "Samsung Health에 뜨기까지 몇 분 걸릴 수 있어요.")
     GlassCard {
-        StatLine("${r.newWorkouts}", "개 새 운동", emphasize = true)
-        StatLine("${r.alreadyThere}", "개 이미 있던 운동")
-        StatLine("${r.recordsWritten}", "개 Health Connect 기록")
-        if (!r.existingChecked) Muted("이미 옮긴 운동을 확인하지 못해서 전부 다시 썼어요. 같은 기록이라 중복은 생기지 않아요.")
+        StatLine(n(r.newWorkouts), "개 새 운동", emphasize = true)
+        StatLine(n(r.alreadyThere), "개 이미 있던 운동")
+        StatLine(n(r.recordsWritten), "개 Health Connect 기록")
+        if (r.recordCounts.isNotEmpty()) MutedPublic(r.recordCounts.entries.sortedByDescending { it.value }.joinToString(" · ") { "${Labels.record(it.key)} ${n(it.value)}" })
+        if (!r.existingChecked) MutedPublic("이미 옮긴 운동을 확인하지 못해서 전부 다시 썼어요. 같은 기록이라 중복은 생기지 않아요.")
     }
     if (r.failed > 0) GlassCard {
-        Text("${r.failed}개는 옮기지 못했어요", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
-        Muted("'이미 옮긴 운동도 다시 쓰기'를 켜고 한 번 더 하면 빠진 걸 채울 수 있어요.")
+        Text("${n(r.failed)}개는 옮기지 못했어요", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+        MutedPublic("고급에서 '이미 옮긴 운동도 다시 쓰기'를 켜고 한 번 더 하면 빠진 걸 채울 수 있어요.")
     }
     PrimaryButton("Samsung Health 열기 💚", onOpenSamsungHealth)
+    SecondaryButton("기록 보기", onHistory)
     SecondaryButton("처음으로", onAgain)
 }
 
 @Composable
-fun ErrorScreen(message: String, onBack: () -> Unit) = Page {
+fun ErrorContent(message: String, onBack: () -> Unit) = Page {
     ScreenHeader("잠깐 멈췄어요", null)
     GlassCard { Text(message, style = MaterialTheme.typography.bodyMedium) }
     PrimaryButton("처음으로", onBack)

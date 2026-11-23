@@ -12,7 +12,6 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.minjun.healthbridge.apple.AppleExportReader
 import com.minjun.healthbridge.apple.NotAppleExportException
-import com.minjun.healthbridge.importer.ImportPreview
 import com.minjun.healthbridge.importer.ImportProgress
 import com.minjun.healthbridge.importer.ImportReport
 import com.minjun.healthbridge.importer.ImportWorker
@@ -36,22 +35,31 @@ sealed interface UpdateState {
 sealed interface UiState {
     data object Pick : UiState
     data object Reading : UiState
-    data class Preview(val uri: Uri, val preview: ImportPreview, val options: ImportOptions) : UiState
+    data class Preview(
+        val uri: Uri,
+        val scan: com.minjun.healthbridge.model.ScanSummary,
+        val options: ImportOptions,
+        val fileName: String,
+        val fileSize: Long,
+    ) : UiState
     data class Running(val progress: ImportProgress) : UiState
     data class Done(val report: ImportReport) : UiState
     data class Error(val message: String) : UiState
 }
 
-class ImportViewModel(app: Application) : AndroidViewModel(app) {
+class ImportViewModel(private val app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow<UiState>(UiState.Pick)
     val state: StateFlow<UiState> = _state
     private val work = WorkManager.getInstance(app)
 
     init {
         checkForUpdate()
+        refreshPermissions()
+        refreshHistory()
         // 앱을 다시 열었을 때 진행 중이던 가져오기를 이어서 보여준다
         work.getWorkInfosForUniqueWorkLiveData(WORK_NAME).observeForever { infos ->
             val info = infos?.lastOrNull() ?: return@observeForever
+            if (info.state.isFinished) refreshHistory()
             if (_state.value is UiState.Preview || _state.value is UiState.Reading) return@observeForever
             _state.value = when (info.state) {
                 WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED -> UiState.Running(
@@ -76,12 +84,14 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun open(uri: Uri, options: ImportOptions = ImportOptions()) {
+    fun open(uri: Uri, options: ImportOptions = ImportOptions(), name: String? = null, size: Long? = null) {
         _state.value = UiState.Reading
+        selectTab(Tab.Transfer)
+        val (fileName, fileSize) = if (name != null && size != null) name to size else fileInfo(uri)
         viewModelScope.launch {
             _state.value = try {
-                val preview = withContext(Dispatchers.IO) { reader(uri).let { com.minjun.healthbridge.importer.ImportPipeline(it, NoWrite) { emptySet() } }.preview(options.watchOnly) }
-                UiState.Preview(uri, preview, options)
+                val scan = withContext(Dispatchers.IO) { reader(uri).scan(options.watchOnly) }
+                UiState.Preview(uri, scan, options, fileName, fileSize)
             } catch (e: NotAppleExportException) {
                 UiState.Error("애플 건강 내보내기 파일이 아니에요 😢\n아이폰 건강 앱 → 프로필 → '모든 건강 데이터 내보내기'로 만든 zip 파일을 골라주세요")
             } catch (e: Exception) {
@@ -93,12 +103,12 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
     /** 애플워치만/전체를 바꾸면 운동 개수가 달라지므로 다시 미리보기 */
     fun updateOptions(options: ImportOptions) {
         val s = _state.value as? UiState.Preview ?: return
-        if (s.options.watchOnly != options.watchOnly) open(s.uri, options) else _state.value = s.copy(options = options)
+        if (s.options.watchOnly != options.watchOnly) open(s.uri, options, s.fileName, s.fileSize) else _state.value = s.copy(options = options)
     }
 
     fun start() {
         val s = _state.value as? UiState.Preview ?: return
-        _state.value = UiState.Running(ImportProgress("이미 옮긴 운동 확인 중", 0, s.preview.workoutCount))
+        _state.value = UiState.Running(ImportProgress("이미 옮긴 운동 확인 중", 0, s.scan.workoutCount))
         viewModelScope.launch {
             // Health Connect 읽기는 앱이 화면에 있을 때만 확실히 되므로 여기서 미리 읽는다
             val idsFile = withContext(Dispatchers.IO) {
@@ -111,7 +121,7 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                 }.getOrNull()
             }
             val request = OneTimeWorkRequestBuilder<ImportWorker>()
-                .setInputData(ImportWorker.inputFor(s.uri, s.options, idsFile))
+                .setInputData(ImportWorker.inputFor(s.uri, s.options, idsFile, s.fileName, s.fileSize))
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
             work.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)
@@ -121,6 +131,8 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
     /** 다른 앱에서 공유받은 파일: 임시 권한이 사라져도 되도록 앱 전용 공간에 복사한 뒤 연다 */
     fun openShared(uri: Uri) {
         _state.value = UiState.Reading
+        selectTab(Tab.Transfer)
+        val (name, size) = fileInfo(uri)
         viewModelScope.launch {
             val file = withContext(Dispatchers.IO) {
                 runCatching {
@@ -131,7 +143,7 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                 }.getOrNull()
             }
             if (file == null) showError("파일을 복사하지 못했어요 😢 저장 공간을 확인하거나, 앱에서 'zip 고르기'로 열어주세요")
-            else open(Uri.fromFile(file))
+            else open(Uri.fromFile(file), name = name, size = size)
         }
     }
 
@@ -139,6 +151,44 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         work.pruneWork()
         com.minjun.healthbridge.importer.ImportFiles.clear(java.io.File(getApplication<Application>().filesDir, "import"))
         _state.value = UiState.Pick
+    }
+
+    enum class Tab { Home, Transfer, History }
+    private val _tab = MutableStateFlow(Tab.Home)
+    val tab: StateFlow<Tab> = _tab
+    fun selectTab(t: Tab) { _tab.value = t; if (t == Tab.History) refreshHistory() }
+
+    private val historyStore = com.minjun.healthbridge.history.HistoryStore(java.io.File(app.filesDir, "history.json"))
+    private val _history = MutableStateFlow<List<com.minjun.healthbridge.history.HistoryEntry>>(emptyList())
+    val history: StateFlow<List<com.minjun.healthbridge.history.HistoryEntry>> = _history
+    fun refreshHistory() {
+        viewModelScope.launch { _history.value = withContext(Dispatchers.IO) { historyStore.list() } }
+    }
+
+    enum class Perm { Checking, Granted, Missing, Unavailable }
+    private val _perm = MutableStateFlow(Perm.Checking)
+    val perm: StateFlow<Perm> = _perm
+    fun refreshPermissions() {
+        val app = getApplication<Application>()
+        if (androidx.health.connect.client.HealthConnectClient.getSdkStatus(app) != androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE) {
+            _perm.value = Perm.Unavailable; return
+        }
+        viewModelScope.launch {
+            val have = runCatching {
+                androidx.health.connect.client.HealthConnectClient.getOrCreate(app).permissionController.getGrantedPermissions()
+            }.getOrDefault(emptySet())
+            _perm.value = if (have.containsAll(com.minjun.healthbridge.hc.Permissions.required(ImportOptions()))) Perm.Granted else Perm.Missing
+        }
+    }
+
+    private fun fileInfo(uri: Uri): Pair<String, Long> {
+        val app = getApplication<Application>()
+        if (uri.scheme == "file") return (uri.lastPathSegment ?: "내보내기.zip") to (uri.path?.let { java.io.File(it).length() } ?: 0L)
+        return runCatching {
+            app.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                if (c.moveToFirst()) (c.getString(0) ?: "내보내기.zip") to (if (c.isNull(1)) 0L else c.getLong(1)) else null
+            }
+        }.getOrNull() ?: ("내보내기.zip" to 0L)
     }
 
     private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)
@@ -199,17 +249,12 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun showError(message: String) { _state.value = UiState.Error(message) }
+    fun showError(message: String) { _state.value = UiState.Error(message); selectTab(Tab.Transfer) }
 
     private fun reader(uri: Uri) = AppleExportReader(
         open = { getApplication<Application>().contentResolver.openInputStream(uri) ?: throw NotAppleExportException() },
         parserFactory = { Xml.newPullParser() },
     )
-
-    private object NoWrite : com.minjun.healthbridge.hc.RecordWriter {
-        override suspend fun write(records: List<androidx.health.connect.client.records.Record>) =
-            com.minjun.healthbridge.hc.WriteResult(0, 0)
-    }
 
     companion object { const val WORK_NAME = "apple-import" }
 }

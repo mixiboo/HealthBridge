@@ -48,6 +48,7 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                     notificationManager().notify(NOTIFICATION_ID, notification(p.phase, p.done, p.total))
                 }
             }
+            record(report, null)
             Result.success(
                 workDataOf(
                     KEY_NEW to report.newWorkouts, KEY_EXISTING to report.alreadyThere,
@@ -56,12 +57,36 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
                 ),
             )
         } catch (e: NotAppleExportException) {
-            Result.failure(workDataOf(KEY_ERROR to (e.message ?: "애플 건강 내보내기 파일이 아니에요")))
+            fail(e.message ?: "애플 건강 내보내기 파일이 아니에요")
         } catch (e: SecurityException) {
-            Result.failure(workDataOf(KEY_ERROR to "권한이 없어요. 파일을 다시 선택하거나 Health Connect 권한을 확인해주세요"))
+            fail("권한이 없어요. 파일을 다시 선택하거나 Health Connect 권한을 확인해주세요")
         } catch (e: Exception) {
-            Result.failure(workDataOf(KEY_ERROR to "문제가 생겼어요: ${e.message}"))
+            fail("문제가 생겼어요: ${e.message}")
         }
+    }
+
+    private fun fail(message: String): Result {
+        record(null, message)
+        return Result.failure(workDataOf(KEY_ERROR to message))
+    }
+
+    /** 기록 탭용: 폰 안에만 저장, 30일 보관 */
+    private fun record(report: ImportReport?, error: String?) = runCatching {
+        com.minjun.healthbridge.history.HistoryStore(java.io.File(applicationContext.filesDir, "history.json")).add(
+            com.minjun.healthbridge.history.HistoryEntry(
+                timeMillis = System.currentTimeMillis(),
+                fileName = inputData.getString(KEY_FILE_NAME) ?: "내보내기.zip",
+                fileSizeBytes = inputData.getLong(KEY_FILE_SIZE, 0),
+                filesUsed = report?.filesUsed ?: 0,
+                newWorkouts = report?.newWorkouts ?: 0,
+                alreadyThere = report?.alreadyThere ?: 0,
+                recordsWritten = report?.recordsWritten ?: 0,
+                failed = report?.failed ?: 0,
+                recordCounts = report?.recordCounts.orEmpty(),
+                success = error == null,
+                message = error,
+            ),
+        )
     }
 
     private fun notificationManager() =
@@ -95,11 +120,15 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         const val KEY_ERROR = "error"
         const val KEY_EXISTING_FILE = "existingFile"
         const val KEY_CHECKED = "checked"
+        const val KEY_FILE_NAME = "fileName"
+        const val KEY_FILE_SIZE = "fileSize"
         private const val CHANNEL = "import"
         private const val NOTIFICATION_ID = 7
 
-        fun inputFor(uri: Uri, o: ImportOptions, existingIdsFile: String?): Data = workDataOf(
+        fun inputFor(uri: Uri, o: ImportOptions, existingIdsFile: String?, fileName: String, fileSize: Long): Data = workDataOf(
             KEY_URI to uri.toString(), KEY_EXISTING_FILE to existingIdsFile,
+            KEY_FILE_NAME to fileName, KEY_FILE_SIZE to fileSize,
+            "workoutTypes" to o.workoutTypes?.toTypedArray(),
             "workouts" to o.workouts, "workoutHeartRate" to o.workoutHeartRate, "routes" to o.routes,
             "allDayHeartRate" to o.allDayHeartRate, "restingHrAndWeight" to o.restingHrAndWeight,
             "stepsAndSleep" to o.stepsAndSleep, "watchOnly" to o.watchOnly, "rewriteExisting" to o.rewriteExisting,
@@ -115,6 +144,7 @@ class ImportWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             stepsAndSleep = d.getBoolean("stepsAndSleep", false),
             watchOnly = d.getBoolean("watchOnly", true),
             rewriteExisting = d.getBoolean("rewriteExisting", false),
+            workoutTypes = d.getStringArray("workoutTypes")?.toSet(),
             from = d.getLong("from", -1).takeIf { it >= 0 }?.let(Instant::ofEpochMilli),
             to = d.getLong("to", -1).takeIf { it >= 0 }?.let(Instant::ofEpochMilli),
         )
