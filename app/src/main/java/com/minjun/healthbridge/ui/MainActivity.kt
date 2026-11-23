@@ -1,80 +1,105 @@
 package com.minjun.healthbridge.ui
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.core.content.IntentCompat
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
-import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
-import androidx.health.connect.client.records.DistanceRecord
-import androidx.health.connect.client.records.ExerciseSessionRecord
-import androidx.health.connect.client.records.HeartRateRecord
-import com.minjun.healthbridge.spike.SpikeWriter
+import androidx.lifecycle.lifecycleScope
+import com.minjun.healthbridge.hc.Permissions
+import com.minjun.healthbridge.ui.screens.DoneScreen
+import com.minjun.healthbridge.ui.screens.ErrorScreen
+import com.minjun.healthbridge.ui.screens.PickScreen
+import com.minjun.healthbridge.ui.screens.PreviewScreen
+import com.minjun.healthbridge.ui.screens.ProgressScreen
+import com.minjun.healthbridge.ui.screens.ReadingScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    private val spikePermissions = setOf(
-        HealthPermission.getWritePermission(ExerciseSessionRecord::class),
-        HealthPermission.getWritePermission(HeartRateRecord::class),
-        HealthPermission.getWritePermission(ActiveCaloriesBurnedRecord::class),
-        HealthPermission.getWritePermission(DistanceRecord::class),
-        HealthPermission.PERMISSION_WRITE_EXERCISE_ROUTE,
-    )
+    private val vm: ImportViewModel by viewModels()
+
+    private val pickZip = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            vm.open(uri)
+        }
+    }
+
+    private val askHealth = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+        val s = vm.state.value as? UiState.Preview ?: return@registerForActivityResult
+        val needed = Permissions.forOptions(s.options)
+        if (granted.containsAll(needed)) vm.start()
+        else vm.showError("Health Connect 권한이 필요해요 🙏\n권한 화면에서 선택한 항목을 모두 허용해주세요.")
+    }
+
+    private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val sdkOk = HealthConnectClient.getSdkStatus(this) == HealthConnectClient.SDK_AVAILABLE
-        var status by mutableStateOf(if (sdkOk) "준비됐어요 😊" else "Health Connect를 쓸 수 없어요 😢")
-        val client = if (sdkOk) HealthConnectClient.getOrCreate(this) else null
-
-        val launcher = registerForActivityResult(
-            PermissionController.createRequestPermissionResultContract()
-        ) { granted ->
-            status = if (granted.containsAll(spikePermissions)) "권한 OK! 다시 눌러주세요" else "권한이 일부 빠졌어요: 경로·심박 권한을 확인해주세요"
-        }
+        if (Build.VERSION.SDK_INT >= 33) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (savedInstanceState == null) handleIntent(intent)
 
         setContent {
             MaterialTheme {
-                val scope = rememberCoroutineScope()
-                var busy by remember { mutableStateOf(false) }
-                Column(
-                    Modifier.fillMaxSize().padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Text("헬스 브릿지 실험 🧪", style = MaterialTheme.typography.headlineSmall)
-                    Text("버튼을 누르면 1시간 전에 30분 달리기(심박·경로·칼로리·거리 포함)가 Health Connect에 들어가요. Samsung Health에서 어떻게 보이는지 확인해주세요!")
-                    Button(enabled = client != null && !busy, onClick = {
-                        scope.launch {
-                            busy = true
-                            val c = client!!
-                            val have = c.permissionController.getGrantedPermissions()
-                            if (!have.containsAll(spikePermissions)) {
-                                launcher.launch(spikePermissions)
-                            } else {
-                                status = runCatching { SpikeWriter.writeSample(c) }
-                                    .fold({ "넣었어요! 🎉 Samsung Health 운동 기록을 열어보세요" }, { "실패: ${it.message}" })
-                            }
-                            busy = false
-                        }
-                    }) { Text("테스트 운동 넣기") }
-                    Text(status)
+                Surface {
+                    val state by vm.state.collectAsState()
+                    when (val s = state) {
+                        UiState.Pick -> PickScreen { pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
+                        UiState.Reading -> ReadingScreen()
+                        is UiState.Preview -> PreviewScreen(s.preview, s.options, vm::updateOptions, ::startImport, vm::reset)
+                        is UiState.Running -> ProgressScreen(s.progress)
+                        is UiState.Done -> DoneScreen(s.report, ::openSamsungHealth, vm::reset)
+                        is UiState.Error -> ErrorScreen(s.message, vm::reset)
+                    }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    /** 파일 앱/퀵쉐어에서 "헬스 브릿지로 열기" */
+    private fun handleIntent(intent: Intent?) {
+        val uri: Uri? = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            else -> null
+        }
+        if (uri != null) {
+            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            vm.open(uri)
+        }
+    }
+
+    private fun startImport() {
+        val s = vm.state.value as? UiState.Preview ?: return
+        if (HealthConnectClient.getSdkStatus(this) != HealthConnectClient.SDK_AVAILABLE) {
+            vm.showError("Health Connect를 쓸 수 없어요 😢\n설정 → 보안 및 개인정보 보호 → Health Connect를 확인하거나 업데이트해주세요.")
+            return
+        }
+        val needed = Permissions.forOptions(s.options)
+        lifecycleScope.launch {
+            val have = HealthConnectClient.getOrCreate(this@MainActivity).permissionController.getGrantedPermissions()
+            if (have.containsAll(needed)) vm.start() else askHealth.launch(needed)
+        }
+    }
+
+    private fun openSamsungHealth() {
+        val launch = packageManager.getLaunchIntentForPackage("com.sec.android.app.shealth")
+        if (launch != null) startActivity(launch)
     }
 }

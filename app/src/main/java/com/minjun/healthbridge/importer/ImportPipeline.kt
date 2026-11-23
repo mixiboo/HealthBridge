@@ -33,7 +33,7 @@ class ImportPipeline(
         )
     }
 
-    suspend fun run(options: ImportOptions, onProgress: (ImportProgress) -> Unit): ImportReport {
+    suspend fun run(options: ImportOptions, onProgress: suspend (ImportProgress) -> Unit): ImportReport {
         var written = 0
         var failed = 0
         suspend fun flush(records: List<Record>) {
