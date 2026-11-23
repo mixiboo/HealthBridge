@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,7 +44,7 @@ fun Page(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun PickScreen(onPick: () -> Unit) = Page {
+fun PickScreen(onPick: () -> Unit, onSample: () -> Unit, sampleMessage: String?) = Page {
     Text("헬스 브릿지 ⌚➡️💚", style = MaterialTheme.typography.headlineSmall)
     Text("애플워치로 한 운동을 Samsung Health로 옮겨요.")
     Card { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -53,6 +54,8 @@ fun PickScreen(onPick: () -> Unit) = Page {
         Text("4. 아래 버튼으로 zip 고르기, 또는 파일 앱에서 '헬스 브릿지로 열기'")
     } }
     Button(onClick = onPick, modifier = Modifier.fillMaxWidth()) { Text("내보내기 zip 고르기 📦") }
+    TextButton(onClick = onSample, modifier = Modifier.fillMaxWidth()) { Text("🧪 샘플 운동 넣어보기 (1시간 전 30분 달리기)") }
+    if (sampleMessage != null) Text(sampleMessage)
     Text("🔒 이 앱은 인터넷 권한이 없어서 건강 데이터가 폰 밖으로 나가지 않아요.", style = MaterialTheme.typography.bodySmall)
 }
 

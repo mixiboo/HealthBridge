@@ -9,6 +9,7 @@ import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
@@ -60,6 +61,12 @@ object RecordFactory {
                 startTime = start, startZoneOffset = off, endTime = end, endZoneOffset = endOff,
                 energy = Energy.kilocalories(it),
                 metadata = meta(RecordIds.forSample("kcal", start, end, wid), w.isFromWatch),
+            )
+            // Samsung Health는 운동 칼로리를 TotalCaloriesBurned로 읽는다 (2026-11-23 실기기 실험)
+            out += TotalCaloriesBurnedRecord(
+                startTime = start, startZoneOffset = off, endTime = end, endZoneOffset = endOff,
+                energy = Energy.kilocalories(it),
+                metadata = meta(RecordIds.forSample("totalkcal", start, end, wid), w.isFromWatch),
             )
         }
         w.distanceMeters?.takeIf { it > 0 }?.let {

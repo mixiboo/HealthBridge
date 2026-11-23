@@ -5,6 +5,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import com.minjun.healthbridge.model.ImportOptions
 import org.junit.Assert.assertFalse
@@ -17,6 +18,7 @@ class PermissionsTest {
         assertTrue(p.contains(HealthPermission.getWritePermission(ExerciseSessionRecord::class)))
         assertTrue(p.contains(HealthPermission.getWritePermission(HeartRateRecord::class)))
         assertTrue(p.contains(HealthPermission.PERMISSION_WRITE_EXERCISE_ROUTE))
+        assertTrue(p.contains(HealthPermission.getWritePermission(TotalCaloriesBurnedRecord::class)))
         assertTrue(p.contains(HealthPermission.getReadPermission(ExerciseSessionRecord::class)))
         assertFalse(p.contains(HealthPermission.getWritePermission(StepsRecord::class)))
         assertFalse(p.contains(HealthPermission.getWritePermission(WeightRecord::class)))

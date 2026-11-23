@@ -18,6 +18,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.minjun.healthbridge.hc.Permissions
+import com.minjun.healthbridge.model.ImportOptions
 import com.minjun.healthbridge.ui.screens.DoneScreen
 import com.minjun.healthbridge.ui.screens.ErrorScreen
 import com.minjun.healthbridge.ui.screens.PickScreen
@@ -43,6 +44,22 @@ class MainActivity : ComponentActivity() {
         else vm.showError("Health Connect 권한이 필요해요 🙏\n권한 화면에서 선택한 항목을 모두 허용해주세요.")
     }
 
+    private val askSample = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+        if (granted.containsAll(Permissions.forOptions(ImportOptions()))) vm.insertSample()
+        else vm.showError("Health Connect 권한이 필요해요 🙏")
+    }
+
+    private fun insertSample() {
+        if (HealthConnectClient.getSdkStatus(this) != HealthConnectClient.SDK_AVAILABLE) {
+            vm.showError("Health Connect를 쓸 수 없어요 😢"); return
+        }
+        val needed = Permissions.forOptions(ImportOptions())
+        lifecycleScope.launch {
+            val have = HealthConnectClient.getOrCreate(this@MainActivity).permissionController.getGrantedPermissions()
+            if (have.containsAll(needed)) vm.insertSample() else askSample.launch(needed)
+        }
+    }
+
     private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,7 +72,14 @@ class MainActivity : ComponentActivity() {
                 Surface {
                     val state by vm.state.collectAsState()
                     when (val s = state) {
-                        UiState.Pick -> PickScreen { pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
+                        UiState.Pick -> {
+                            val msg by vm.sampleMessage.collectAsState()
+                            PickScreen(
+                                onPick = { pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+                                onSample = ::insertSample,
+                                sampleMessage = msg,
+                            )
+                        }
                         UiState.Reading -> ReadingScreen()
                         is UiState.Preview -> PreviewScreen(s.preview, s.options, vm::updateOptions, ::startImport, vm::reset)
                         is UiState.Running -> ProgressScreen(s.progress)

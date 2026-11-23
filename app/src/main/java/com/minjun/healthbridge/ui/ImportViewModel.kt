@@ -99,6 +99,18 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = UiState.Pick
     }
 
+    private val _sampleMessage = MutableStateFlow<String?>(null)
+    val sampleMessage: StateFlow<String?> = _sampleMessage
+
+    fun insertSample() {
+        viewModelScope.launch {
+            val client = androidx.health.connect.client.HealthConnectClient.getOrCreate(getApplication())
+            val r = com.minjun.healthbridge.hc.HealthConnectWriter(client)
+                .write(com.minjun.healthbridge.importer.SampleWorkout.records(java.time.Instant.now()))
+            _sampleMessage.value = if (r.failed == 0) "넣었어요! 🎉 Samsung Health 운동 기록을 열어보세요" else "실패했어요 😢 권한을 확인해주세요"
+        }
+    }
+
     fun showError(message: String) { _state.value = UiState.Error(message) }
 
     private fun reader(uri: Uri) = AppleExportReader(

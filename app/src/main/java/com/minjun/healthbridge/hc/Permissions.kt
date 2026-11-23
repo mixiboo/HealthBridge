@@ -8,6 +8,7 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import com.minjun.healthbridge.model.ImportOptions
 
@@ -18,6 +19,7 @@ object Permissions {
             add(HealthPermission.getWritePermission(ExerciseSessionRecord::class))
             add(HealthPermission.getReadPermission(ExerciseSessionRecord::class)) // 이미 옮긴 운동 확인용
             add(HealthPermission.getWritePermission(ActiveCaloriesBurnedRecord::class))
+            add(HealthPermission.getWritePermission(TotalCaloriesBurnedRecord::class))
             add(HealthPermission.getWritePermission(DistanceRecord::class))
             if (o.routes) add(HealthPermission.PERMISSION_WRITE_EXERCISE_ROUTE)
         }

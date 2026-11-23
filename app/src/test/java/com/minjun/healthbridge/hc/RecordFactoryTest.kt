@@ -9,6 +9,7 @@ import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import com.minjun.healthbridge.apple.AppleDates
 import com.minjun.healthbridge.model.AppleTime
@@ -55,6 +56,8 @@ class RecordFactoryTest {
         val routeResult = session.exerciseRouteResult as ExerciseRouteResult.Data
         assertEquals(3, routeResult.exerciseRoute.route.size)
         assertEquals(250.5, recs.only<ActiveCaloriesBurnedRecord>().single().energy.inKilocalories, 1e-9)
+        // Samsung Health는 운동 칼로리를 TotalCaloriesBurned로 읽는다 (실기기 실험 결과)
+        assertEquals(250.5, recs.only<TotalCaloriesBurnedRecord>().single().energy.inKilocalories, 1e-9)
         assertEquals(5010.0, recs.only<DistanceRecord>().single().distance.inMeters, 1e-9)
         assertEquals(3, recs.only<HeartRateRecord>().single().samples.size)
         val ids = recs.map { it.metadata.clientRecordId!! }
@@ -75,6 +78,7 @@ class RecordFactoryTest {
         val w = workout(kcal = 0.0, meters = 0.0)
         val recs = RecordFactory.forWorkout(w, emptyList(), emptyList(), ImportOptions())
         assertTrue(recs.only<ActiveCaloriesBurnedRecord>().isEmpty())
+        assertTrue(recs.only<TotalCaloriesBurnedRecord>().isEmpty())
         assertTrue(recs.only<DistanceRecord>().isEmpty())
         assertTrue(recs.only<ExerciseSessionRecord>().single().exerciseRouteResult is ExerciseRouteResult.NoData)
     }
