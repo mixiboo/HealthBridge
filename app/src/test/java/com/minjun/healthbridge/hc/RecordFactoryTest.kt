@@ -119,6 +119,27 @@ class RecordFactoryTest {
         hr.zipWithNext().forEach { (a, b) -> assertTrue(a.endTime.isBefore(b.startTime)) }
     }
 
+    @Test fun route_point_exactly_at_end_is_dropped() {
+        val w = workout()
+        val pts = listOf(
+            RoutePoint(w.start.instant, 35.0, 128.0, null),
+            RoutePoint(w.start.instant.plusSeconds(60), 35.1, 128.0, null),
+            RoutePoint(w.end.instant, 35.2, 128.0, null),
+        )
+        val s = RecordFactory.forWorkout(w, emptyList(), pts, ImportOptions()).only<ExerciseSessionRecord>().single()
+        assertEquals(2, (s.exerciseRouteResult as ExerciseRouteResult.Data).exerciseRoute.route.size)
+    }
+
+    @Test fun very_long_route_downsampled() {
+        val w = workout(end = "2025-01-02 17:00:00 +0900")
+        val pts = (0 until 30_000).map { RoutePoint(w.start.instant.plusSeconds(it + 1L), 35.0 + it * 1e-6, 128.0, null) }
+        val s = RecordFactory.forWorkout(w, emptyList(), pts, ImportOptions()).only<ExerciseSessionRecord>().single()
+        val route = (s.exerciseRouteResult as ExerciseRouteResult.Data).exerciseRoute.route
+        assertTrue(route.size <= RecordFactory.MAX_ROUTE_POINTS)
+        assertEquals(pts.first().time, route.first().time)
+        assertEquals(pts.last().time, route.last().time)
+    }
+
     @Test fun duplicate_heart_timestamps_collapsed() {
         val w = workout()
         val s = HeartSample(AppleTime(w.start.instant.plusSeconds(60), w.start.offset), 130)

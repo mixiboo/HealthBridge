@@ -29,6 +29,7 @@ import kotlin.math.roundToLong
 /** 애플 데이터 → Health Connect 기록. 모든 기록에 고정 clientRecordId를 붙인다. */
 object RecordFactory {
     const val MAX_HEART_SAMPLES = 1000
+    const val MAX_ROUTE_POINTS = 10_000
     private val SLEEP_GAP: Duration = Duration.ofMinutes(30)
     private val appleWatch = Device(type = Device.TYPE_WATCH, manufacturer = "Apple", model = "Apple Watch")
 
@@ -44,8 +45,10 @@ object RecordFactory {
         val out = ArrayList<Record>()
 
         val points = if (options.routes) route.orEmpty()
-            .filter { !it.time.isBefore(start) && !it.time.isAfter(end) }
+            .filter { !it.time.isBefore(start) && it.time.isBefore(end) } // Health Connect: 경로 시각은 [시작, 종료) 안이어야 함
             .sortedBy { it.time }
+            .distinctBy { it.time }
+            .let(::downsample)
             .map { ExerciseRoute.Location(time = it.time, latitude = it.lat, longitude = it.lon, altitude = it.altitudeM?.let(Length::meters)) }
         else emptyList()
 
@@ -78,6 +81,13 @@ object RecordFactory {
         }
         if (options.workoutHeartRate) out += heartChunks(heart, "heart", wid, w.isFromWatch)
         return out
+    }
+
+    /** 아주 긴 경로는 고르게 솎아서 최대 MAX_ROUTE_POINTS개로 (처음·끝 점은 유지) */
+    private fun downsample(points: List<RoutePoint>): List<RoutePoint> {
+        if (points.size <= MAX_ROUTE_POINTS) return points
+        val step = (points.size - 1).toDouble() / (MAX_ROUTE_POINTS - 1)
+        return (0 until MAX_ROUTE_POINTS).map { points[Math.round(it * step).toInt()] }
     }
 
     fun allDayHeart(samples: List<HeartSample>): List<HeartRateRecord> = heartChunks(samples, "dayheart", "allday", true)

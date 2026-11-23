@@ -25,6 +25,13 @@ class AppleExportReaderTest {
         assertEquals(setOf(path), routes.keys)
     }
 
+    @Test fun for_each_route_streams_one_file_at_a_time() {
+        val path = "/workout-routes/route_2025-01-02_7.00am.gpx"
+        val seen = ArrayList<Pair<String, Int>>()
+        reader(TestZips.koreanExport()).forEachRoute(setOf(path, "/workout-routes/missing.gpx")) { p, pts -> seen += p to pts.size }
+        assertEquals(listOf(path to 2), seen)
+    }
+
     @Test(expected = NotAppleExportException::class)
     fun not_apple_zip_throws() {
         reader(TestZips.zip("notes.txt" to "hello".toByteArray())).readWorkouts(true)

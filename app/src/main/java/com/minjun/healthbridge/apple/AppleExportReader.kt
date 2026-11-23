@@ -31,19 +31,28 @@ class AppleExportReader(
     fun readRecords(options: ImportOptions, workouts: List<AppleWorkout>, sink: RecordSink) =
         withHealthXml { xml.readRecords(it, options, workouts, sink) }
 
-    /** 키: XML에 적힌 경로("/workout-routes/a.gpx"). 없는 경로는 결과에서 빠진다. */
+    /** 키: XML에 적힌 경로("/workout-routes/a.gpx"). 없는 경로는 결과에서 빠진다. (작은 입력용) */
     fun readRoutes(paths: Set<String>): Map<String, List<RoutePoint>> {
-        if (paths.isEmpty()) return emptyMap()
-        val wanted = paths.associateBy { it.trimStart('/') }
         val out = HashMap<String, List<RoutePoint>>()
+        forEachRoute(paths) { path, points -> out[path] = points }
+        return out
+    }
+
+    /** 경로 파일을 zip 순서대로 하나씩 읽어 바로 넘긴다 → 모든 경로를 한꺼번에 메모리에 올리지 않음 */
+    fun forEachRoute(paths: Set<String>, onRoute: (path: String, points: List<RoutePoint>) -> Unit) {
+        if (paths.isEmpty()) return
+        val wanted = paths.associateBy { it.trimStart('/') }
+        var remaining = wanted.size
         guarded {
             eachEntry { name, stream ->
                 val key = wanted.entries.firstOrNull { name.endsWith(it.key) }?.value
-                if (key != null) out[key] = GpxParser.parse(stream, parserFactory)
-                out.size < wanted.size
+                if (key != null) {
+                    onRoute(key, GpxParser.parse(stream, parserFactory))
+                    remaining--
+                }
+                remaining > 0
             }
         }
-        return out
     }
 
     private fun <T> withHealthXml(block: (InputStream) -> T): T = guarded {

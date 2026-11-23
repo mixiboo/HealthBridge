@@ -14,19 +14,11 @@ interface RecordWriter {
 
 data class WriteResult(val written: Int, val failed: Int)
 
-/** Health Connect에 500개씩 나눠 쓴다. 실패한 묶음은 한 번 더 시도하고, 그래도 안 되면 실패로 센다. */
+/** Health Connect 쓰기: 크기 기준으로 묶고, 실패하면 반으로 나눠 문제 기록만 걸러낸다 (BatchingWriter) */
 class HealthConnectWriter(private val client: HealthConnectClient) : RecordWriter {
-    override suspend fun write(records: List<Record>): WriteResult {
-        var ok = 0
-        var bad = 0
-        for (batch in records.chunked(BATCH)) {
-            val success = runCatching { client.insertRecords(batch) }
-                .recoverCatching { client.insertRecords(batch) }
-                .isSuccess
-            if (success) ok += batch.size else bad += batch.size
-        }
-        return WriteResult(ok, bad)
-    }
+    private val batching = BatchingWriter(insert = { client.insertRecords(it) })
+
+    override suspend fun write(records: List<Record>): WriteResult = batching.write(records)
 
     /** 이 앱이 이전에 쓴 운동의 clientRecordId 목록 (재가져오기 때 건너뛰기용) */
     suspend fun existingWorkoutIds(packageName: String): Set<String> {
@@ -47,6 +39,4 @@ class HealthConnectWriter(private val client: HealthConnectClient) : RecordWrite
         } while (token != null)
         return ids
     }
-
-    companion object { const val BATCH = 500 }
 }
