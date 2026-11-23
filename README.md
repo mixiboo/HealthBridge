@@ -24,10 +24,15 @@
 - 빠진 심박·칼로리를 채우려면 **"이미 옮긴 운동도 다시 쓰기"**를 켜고 한 번 더 하세요.
 - 내보내기 파일 없이 표시만 확인하려면 첫 화면의 **🧪 샘플 운동 넣어보기**를 누르세요.
 
+## 설치 · 업데이트 📲
+- [Releases](https://github.com/mixiboo/HealthBridge/releases/latest)에서 `healthbridge-vX.Y.Z.apk`를 받아 설치해요.
+- 그다음부터는 앱 첫 화면에 새 버전이 뜨면 **업데이트하기**만 누르면 돼요 (처음 한 번은 "이 출처 허용"이 필요해요).
+
 ## 개인정보 🔒
-앱에 **인터넷 권한이 없어요.** 건강 데이터는 폰 밖으로 나가지 않아요.
+건강 데이터는 **폰 밖으로 보내지 않아요.** 인터넷은 GitHub에서 새 버전을 확인하고 받을 때만 써요 (`update/UpdateChecker.kt` 한 곳).
 
 ## 개발
 - Kotlin + Jetpack Compose, Health Connect `connect-client 1.1.0`, WorkManager
 - 빌드: `./gradlew assembleDebug` / 테스트: `./gradlew testDebugUnitTest`
+- 릴리스: `app/build.gradle.kts`의 `versionName`을 올리고 같은 이름의 태그(`v0.5.0`)를 푸시하면 GitHub Actions가 서명된 APK를 릴리스에 올려요. 서명 키는 저장소 Secrets(`HB_KEYSTORE_BASE64`, `HB_KEYSTORE_PASSWORD`, `HB_KEY_ALIAS`, `HB_KEY_PASSWORD`)에 있어요.
 - 설계: `docs/2026-11-23-apple-to-samsung-health-design.md`

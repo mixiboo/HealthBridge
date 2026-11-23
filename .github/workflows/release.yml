@@ -1,0 +1,45 @@
+name: Release APK
+
+# v로 시작하는 태그(예: v0.5.0)를 올리면 서명된 APK를 빌드해 GitHub 릴리스에 올린다.
+# 앱은 이 릴리스를 보고 새 버전을 알려준다.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - name: Install SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Check tag matches versionName
+        run: |
+          V=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          test "v$V" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != versionName v$V"; exit 1; }
+      - name: Decode keystore
+        run: echo "${{ secrets.HB_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+      - name: Test and build
+        env:
+          HB_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          HB_KEYSTORE_PASSWORD: ${{ secrets.HB_KEYSTORE_PASSWORD }}
+          HB_KEY_ALIAS: ${{ secrets.HB_KEY_ALIAS }}
+          HB_KEY_PASSWORD: ${{ secrets.HB_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest assembleRelease --console=plain
+          cp app/build/outputs/apk/release/app-release.apk "healthbridge-${GITHUB_REF_NAME}.apk"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "healthbridge-${GITHUB_REF_NAME}.apk" \
+            --title "헬스 브릿지 ${GITHUB_REF_NAME#v}" --notes-file release-notes.md

@@ -12,15 +12,34 @@ android {
         applicationId = "com.minjun.healthbridge"
         minSdk = 28
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
+
+    // 릴리스 서명: GitHub Actions가 Secrets에서 키를 받아 넣는다 (키는 저장소에 없음)
+    signingConfigs {
+        create("release") {
+            val ks = System.getenv("HB_KEYSTORE_PATH")
+            if (ks != null) {
+                storeFile = file(ks)
+                storePassword = System.getenv("HB_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("HB_KEY_ALIAS")
+                keyPassword = System.getenv("HB_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            if (System.getenv("HB_KEYSTORE_PATH") != null) signingConfig = signingConfigs.getByName("release")
+        }
+    }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 
@@ -41,6 +60,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     testImplementation("net.sf.kxml:kxml2:2.3.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }

@@ -23,6 +23,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+sealed interface UpdateState {
+    data object Idle : UpdateState
+    data object Checking : UpdateState
+    data object UpToDate : UpdateState
+    data class Available(val info: com.minjun.healthbridge.update.ReleaseInfo) : UpdateState
+    data class Downloading(val info: com.minjun.healthbridge.update.ReleaseInfo, val progress: Float) : UpdateState
+    data class NeedsPermission(val info: com.minjun.healthbridge.update.ReleaseInfo) : UpdateState
+    data class Failed(val message: String) : UpdateState
+}
+
 sealed interface UiState {
     data object Pick : UiState
     data object Reading : UiState
@@ -38,6 +48,7 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
     private val work = WorkManager.getInstance(app)
 
     init {
+        checkForUpdate()
         // 앱을 다시 열었을 때 진행 중이던 가져오기를 이어서 보여준다
         work.getWorkInfosForUniqueWorkLiveData(WORK_NAME).observeForever { infos ->
             val info = infos?.lastOrNull() ?: return@observeForever
@@ -128,6 +139,52 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         work.pruneWork()
         com.minjun.healthbridge.importer.ImportFiles.clear(java.io.File(getApplication<Application>().filesDir, "import"))
         _state.value = UiState.Pick
+    }
+
+    private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val update: StateFlow<UpdateState> = _update
+
+    /** GitHub 릴리스에서 새 버전 확인 (건강 데이터는 보내지 않음) */
+    fun checkForUpdate(manual: Boolean = false) {
+        if (_update.value is UpdateState.Checking || _update.value is UpdateState.Downloading) return
+        _update.value = UpdateState.Checking
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { com.minjun.healthbridge.update.UpdateChecker.fetchNewer(com.minjun.healthbridge.BuildConfig.VERSION_NAME) }
+            }
+            _update.value = result.fold(
+                { info -> if (info != null) UpdateState.Available(info) else if (manual) UpdateState.UpToDate else UpdateState.Idle },
+                { if (manual) UpdateState.Failed("업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.") else UpdateState.Idle },
+            )
+        }
+    }
+
+    fun installUpdate() {
+        val info = when (val u = _update.value) {
+            is UpdateState.Available -> u.info
+            is UpdateState.NeedsPermission -> u.info
+            else -> return
+        }
+        val app = getApplication<Application>()
+        if (!com.minjun.healthbridge.update.UpdateInstaller.canInstall(app)) {
+            _update.value = UpdateState.NeedsPermission(info)
+            com.minjun.healthbridge.update.UpdateInstaller.openInstallPermission(app)
+            return
+        }
+        _update.value = UpdateState.Downloading(info, 0f)
+        viewModelScope.launch {
+            val file = java.io.File(app.cacheDir, "update/healthbridge-${info.version}.apk")
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    com.minjun.healthbridge.update.UpdateChecker.download(info, file) { p -> _update.value = UpdateState.Downloading(info, p) }
+                    com.minjun.healthbridge.update.UpdateInstaller.install(app, file)
+                }
+            }
+            _update.value = ok.fold(
+                { UpdateState.Available(info) }, // 설치 확인 창이 뜸. 취소하면 다시 누를 수 있게
+                { UpdateState.Failed("업데이트를 받지 못했어요: ${it.message}") },
+            )
+        }
     }
 
     private val _sampleMessage = MutableStateFlow<String?>(null)

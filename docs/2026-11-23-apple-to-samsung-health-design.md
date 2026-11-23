@@ -86,3 +86,9 @@
 - ✅ 운동 중 심박: 평균 139 / 최대 160 bpm, 상세 화면에 심박 차트 표시 → 같은 시간대 HeartRateRecord 방식이 동작함
 - ❌ 경로 지도: Samsung Health가 Health Connect 경로를 지도로 표시하지 않음 (데이터는 Health Connect에 저장됨)
 - ❌→✅ 칼로리: ActiveCaloriesBurned만으로는 안 보임. v0.3에서 TotalCaloriesBurned도 쓰자 "운동 칼로리 250 kcal / 총 칼로리 250 kcal" 표시 확인
+
+## 10. 변경: 앱 안 업데이트 (2026-11-23, 사용자 결정)
+- 사용자가 "앱이 직접 확인·설치"를 골라 **인터넷 권한을 추가**했다. 원래의 "인터넷 권한 없음" 약속은 "인터넷은 업데이트 확인·다운로드에만 쓰고 건강 데이터는 보내지 않는다"로 바뀐다.
+- 네트워크 코드는 `update/UpdateChecker.kt` 한 곳뿐: GitHub API `releases/latest` GET, `github.com/mixiboo/HealthBridge/releases/download/` 아래 APK만 받는다.
+- 설치는 PackageInstaller 세션 + 사용자 확인. 안드로이드가 서명 일치를 검사한다.
+- 릴리스는 GitHub Actions(`.github/workflows/release.yml`)가 태그 `v*`에서 Secrets의 키로 서명해 만든다. 키는 저장소에 없다.

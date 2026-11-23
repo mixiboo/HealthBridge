@@ -91,10 +91,14 @@ class MainActivity : ComponentActivity() {
                     ) { s -> when (s) {
                         UiState.Pick -> {
                             val msg by vm.sampleMessage.collectAsState()
+                            val update by vm.update.collectAsState()
                             PickScreen(
                                 onPick = { pickZip.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
                                 onSample = ::insertSample,
                                 sampleMessage = msg,
+                                update = update,
+                                onUpdate = vm::installUpdate,
+                                onCheckUpdate = { vm.checkForUpdate(manual = true) },
                             )
                         }
                         UiState.Reading -> ReadingScreen()

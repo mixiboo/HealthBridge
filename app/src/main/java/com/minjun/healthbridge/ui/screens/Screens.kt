@@ -73,8 +73,12 @@ private fun Step(n: Int, text: String) {
 }
 
 @Composable
-fun PickScreen(onPick: () -> Unit, onSample: () -> Unit, sampleMessage: String?) = Page {
+fun PickScreen(
+    onPick: () -> Unit, onSample: () -> Unit, sampleMessage: String?,
+    update: com.minjun.healthbridge.ui.UpdateState, onUpdate: () -> Unit, onCheckUpdate: () -> Unit,
+) = Page {
     ScreenHeader("민준의 기록,", "애플워치로 남긴 운동을 Samsung Health로 옮겨요.")
+    UpdateBanner(update, onUpdate)
     GlassCard {
         Text("⌚ → 💚  이렇게 옮겨요", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Step(1, "아이폰 건강 앱 → 오른쪽 위 프로필")
@@ -85,7 +89,42 @@ fun PickScreen(onPick: () -> Unit, onSample: () -> Unit, sampleMessage: String?)
     PrimaryButton("📦 내보내기 zip 고르기", onPick)
     SecondaryButton("🧪 샘플 운동 넣어보기", onSample)
     if (sampleMessage != null) GlassCard { Text(sampleMessage, style = MaterialTheme.typography.bodyMedium) }
-    Muted("🔒 인터넷 권한이 없어서 건강 데이터가 폰 밖으로 나가지 않아요.")
+    Muted("🔒 건강 데이터는 폰 밖으로 보내지 않아요. 인터넷은 업데이트 확인에만 써요.")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Muted("버전 ${com.minjun.healthbridge.BuildConfig.VERSION_NAME}")
+        Spacer(Modifier.weight(1f))
+        androidx.compose.material3.TextButton(onClick = onCheckUpdate) {
+            Text(
+                when (update) {
+                    com.minjun.healthbridge.ui.UpdateState.Checking -> "확인하는 중…"
+                    com.minjun.healthbridge.ui.UpdateState.UpToDate -> "최신 버전이에요 ✓"
+                    else -> "업데이트 확인"
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpdateBanner(update: com.minjun.healthbridge.ui.UpdateState, onUpdate: () -> Unit) {
+    when (update) {
+        is com.minjun.healthbridge.ui.UpdateState.Available -> GlassCard {
+            Text("✨ 새 버전 ${update.info.version}이 있어요", style = MaterialTheme.typography.titleMedium)
+            if (update.info.notes.isNotBlank()) Muted(update.info.notes.lines().take(4).joinToString("\n"))
+            SecondaryButton("업데이트하기", onUpdate)
+        }
+        is com.minjun.healthbridge.ui.UpdateState.Downloading -> GlassCard {
+            Text("새 버전 ${update.info.version} 받는 중", style = MaterialTheme.typography.titleMedium)
+            LinearProgressIndicator(progress = { update.progress }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
+        }
+        is com.minjun.healthbridge.ui.UpdateState.NeedsPermission -> GlassCard {
+            Text("설치 권한이 필요해요", style = MaterialTheme.typography.titleMedium)
+            Muted("방금 열린 화면에서 '이 출처 허용'을 켠 뒤 돌아와서 다시 눌러 주세요.")
+            SecondaryButton("다시 업데이트하기", onUpdate)
+        }
+        is com.minjun.healthbridge.ui.UpdateState.Failed -> GlassCard { Muted(update.message) }
+        else -> Unit
+    }
 }
 
 @Composable
