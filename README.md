@@ -34,5 +34,5 @@
 ## 개발
 - Kotlin + Jetpack Compose, Health Connect `connect-client 1.1.0`, WorkManager
 - 빌드: `./gradlew assembleDebug` / 테스트: `./gradlew testDebugUnitTest`
-- 릴리스: `app/build.gradle.kts`의 `versionName`을 올리고 같은 이름의 태그(`v0.5.0`)를 푸시하면 GitHub Actions가 서명된 APK를 릴리스에 올려요. 서명 키는 저장소 Secrets(`HB_KEYSTORE_BASE64`, `HB_KEYSTORE_PASSWORD`, `HB_KEY_ALIAS`, `HB_KEY_PASSWORD`)에 있어요.
+- 릴리스: `app/build.gradle.kts`의 `versionName`(과 `versionCode`)을 올리고 `release-notes.md`를 고쳐서 `main`에 푸시하면, GitHub Actions가 테스트 후 서명된 APK로 태그 `vX.Y.Z`와 릴리스를 만들어요. 서명 키는 저장소 Secrets(`HB_KEYSTORE_BASE64`, `HB_KEYSTORE_PASSWORD`, `HB_KEY_ALIAS`, `HB_KEY_PASSWORD`)에 있어요.
 - 설계: `docs/2026-11-23-apple-to-samsung-health-design.md`

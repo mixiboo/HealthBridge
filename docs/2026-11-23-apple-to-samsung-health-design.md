@@ -91,4 +91,4 @@
 - 사용자가 "앱이 직접 확인·설치"를 골라 **인터넷 권한을 추가**했다. 원래의 "인터넷 권한 없음" 약속은 "인터넷은 업데이트 확인·다운로드에만 쓰고 건강 데이터는 보내지 않는다"로 바뀐다.
 - 네트워크 코드는 `update/UpdateChecker.kt` 한 곳뿐: GitHub API `releases/latest` GET, `github.com/mixiboo/HealthBridge/releases/download/` 아래 APK만 받는다.
 - 설치는 PackageInstaller 세션 + 사용자 확인. 안드로이드가 서명 일치를 검사한다.
-- 릴리스는 GitHub Actions(`.github/workflows/release.yml`)가 태그 `v*`에서 Secrets의 키로 서명해 만든다. 키는 저장소에 없다.
+- 릴리스는 GitHub Actions(`.github/workflows/release.yml`)가 `main` 푸시 때 versionName에 해당하는 릴리스가 없으면 Secrets의 키로 서명해 태그와 함께 만든다. 키는 저장소에 없다.
