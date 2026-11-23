@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.HealthBridge" parent="android:Theme.Material.NoActionBar">
+        <!-- app-background (다크) -->
+        <item name="android:windowBackground">#1A2027</item>
+    </style>
+</resources>

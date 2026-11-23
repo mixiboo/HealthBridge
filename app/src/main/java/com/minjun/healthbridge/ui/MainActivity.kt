@@ -9,7 +9,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.ui.Modifier
+import com.minjun.healthbridge.ui.theme.EaseOutCubic
+import com.minjun.healthbridge.ui.theme.HealthBridgeTheme
+import com.minjun.healthbridge.ui.theme.LocalGlass
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -66,11 +77,18 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33) askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
         if (savedInstanceState == null) handleIntent(intent)
 
+        enableEdgeToEdge()
         setContent {
-            MaterialTheme {
-                Surface {
+            HealthBridgeTheme {
+                Surface(color = LocalGlass.current.appBackground, modifier = Modifier.fillMaxSize()) {
                     val state by vm.state.collectAsState()
-                    when (val s = state) {
+                    AnimatedContent(
+                        targetState = state,
+                        contentKey = { it::class },
+                        transitionSpec = { fadeIn(tween(340, easing = EaseOutCubic)) togetherWith fadeOut(tween(200)) },
+                        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                        label = "screen",
+                    ) { s -> when (s) {
                         UiState.Pick -> {
                             val msg by vm.sampleMessage.collectAsState()
                             PickScreen(
@@ -84,7 +102,7 @@ class MainActivity : ComponentActivity() {
                         is UiState.Running -> ProgressScreen(s.progress)
                         is UiState.Done -> DoneScreen(s.report, ::openSamsungHealth, vm::reset)
                         is UiState.Error -> ErrorScreen(s.message, vm::reset)
-                    }
+                    } }
                 }
             }
         }
