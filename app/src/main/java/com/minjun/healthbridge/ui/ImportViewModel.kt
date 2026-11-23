@@ -52,38 +52,6 @@ class ImportViewModel(private val app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state
     private val work = WorkManager.getInstance(app)
 
-    init {
-        checkForUpdate()
-        refreshPermissions()
-        refreshHistory()
-        // 앱을 다시 열었을 때 진행 중이던 가져오기를 이어서 보여준다
-        work.getWorkInfosForUniqueWorkLiveData(WORK_NAME).observeForever { infos ->
-            val info = infos?.lastOrNull() ?: return@observeForever
-            if (info.state.isFinished) refreshHistory()
-            if (_state.value is UiState.Preview || _state.value is UiState.Reading) return@observeForever
-            _state.value = when (info.state) {
-                WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED -> UiState.Running(
-                    ImportProgress(
-                        info.progress.getString(ImportWorker.KEY_PHASE) ?: "준비 중",
-                        info.progress.getInt(ImportWorker.KEY_DONE, 0),
-                        info.progress.getInt(ImportWorker.KEY_TOTAL, 0),
-                    ),
-                )
-                WorkInfo.State.SUCCEEDED -> UiState.Done(
-                    ImportReport(
-                        info.outputData.getInt(ImportWorker.KEY_NEW, 0),
-                        info.outputData.getInt(ImportWorker.KEY_EXISTING, 0),
-                        info.outputData.getInt(ImportWorker.KEY_WRITTEN, 0),
-                        info.outputData.getInt(ImportWorker.KEY_FAILED, 0),
-                        info.outputData.getBoolean(ImportWorker.KEY_CHECKED, true),
-                    ),
-                )
-                WorkInfo.State.FAILED -> UiState.Error(info.outputData.getString(ImportWorker.KEY_ERROR) ?: "가져오기에 실패했어요")
-                else -> _state.value
-            }
-        }
-    }
-
     fun open(uri: Uri, options: ImportOptions = ImportOptions(), name: String? = null, size: Long? = null) {
         _state.value = UiState.Reading
         selectTab(Tab.Transfer)
@@ -255,6 +223,39 @@ class ImportViewModel(private val app: Application) : AndroidViewModel(app) {
         open = { getApplication<Application>().contentResolver.openInputStream(uri) ?: throw NotAppleExportException() },
         parserFactory = { Xml.newPullParser() },
     )
+
+    // 주의: init은 모든 프로퍼티 선언 뒤에 있어야 한다 (Kotlin은 위에서부터 초기화 → 앞에 두면 null로 시작 충돌)
+    init {
+        checkForUpdate()
+        refreshPermissions()
+        refreshHistory()
+        // 앱을 다시 열었을 때 진행 중이던 가져오기를 이어서 보여준다
+        work.getWorkInfosForUniqueWorkLiveData(WORK_NAME).observeForever { infos ->
+            val info = infos?.lastOrNull() ?: return@observeForever
+            if (info.state.isFinished) refreshHistory()
+            if (_state.value is UiState.Preview || _state.value is UiState.Reading) return@observeForever
+            _state.value = when (info.state) {
+                WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED -> UiState.Running(
+                    ImportProgress(
+                        info.progress.getString(ImportWorker.KEY_PHASE) ?: "준비 중",
+                        info.progress.getInt(ImportWorker.KEY_DONE, 0),
+                        info.progress.getInt(ImportWorker.KEY_TOTAL, 0),
+                    ),
+                )
+                WorkInfo.State.SUCCEEDED -> UiState.Done(
+                    ImportReport(
+                        info.outputData.getInt(ImportWorker.KEY_NEW, 0),
+                        info.outputData.getInt(ImportWorker.KEY_EXISTING, 0),
+                        info.outputData.getInt(ImportWorker.KEY_WRITTEN, 0),
+                        info.outputData.getInt(ImportWorker.KEY_FAILED, 0),
+                        info.outputData.getBoolean(ImportWorker.KEY_CHECKED, true),
+                    ),
+                )
+                WorkInfo.State.FAILED -> UiState.Error(info.outputData.getString(ImportWorker.KEY_ERROR) ?: "가져오기에 실패했어요")
+                else -> _state.value
+            }
+        }
+    }
 
     companion object { const val WORK_NAME = "apple-import" }
 }

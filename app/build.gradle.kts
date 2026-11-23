@@ -12,8 +12,8 @@ android {
         applicationId = "com.minjun.healthbridge"
         minSdk = 28
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.6.1"
     }
 
     compileOptions {
@@ -40,7 +40,7 @@ android {
             if (System.getenv("HB_KEYSTORE_PATH") != null) signingConfig = signingConfigs.getByName("release")
         }
     }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions { unitTests.isReturnDefaultValues = true; unitTests.isIncludeAndroidResources = true }
 }
 
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
@@ -61,6 +61,9 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("org.robolectric:robolectric:4.16")
+    testImplementation("androidx.test:core:1.7.0")
+    testImplementation("androidx.work:work-testing:2.10.2")
     testImplementation("net.sf.kxml:kxml2:2.3.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }
