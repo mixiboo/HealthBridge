@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE HealthData [
+<!ELEMENT HealthData (ExportDate,Me,(Record|Correlation|Workout|ActivitySummary|ClinicalRecord|Audiogram|VisionPrescription)*)>
+<!ATTLIST HealthData locale CDATA #REQUIRED>
+<!ELEMENT Workout ((MetadataEntry|WorkoutEvent|WorkoutRoute|WorkoutStatistics)*)>
+]>
+<HealthData locale="ko_KR">
+ <ExportDate value="2025-01-10 21:00:00 +0900"/>
+ <Me HKCharacteristicTypeIdentifierBiologicalSex="HKBiologicalSexMale"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="민준의 Apple Watch" sourceVersion="11.2" device="&lt;&lt;HKDevice: 0x0&gt;, name:Apple Watch, manufacturer:Apple Inc., model:Watch&gt;" unit="count/min" creationDate="2025-01-02 07:10:05 +0900" startDate="2025-01-02 07:10:00 +0900" endDate="2025-01-02 07:10:00 +0900" value="145">
+  <MetadataEntry key="HKMetadataKeyHeartRateMotionContext" value="2"/>
+ </Record>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="민준의 Apple Watch" device="&lt;&lt;HKDevice: 0x0&gt;, name:Apple Watch&gt;" unit="count/min" startDate="2025-01-02 12:00:00 +0900" endDate="2025-01-02 12:00:00 +0900" value="70"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="민준의 iPhone" unit="count/min" startDate="2025-01-02 07:15:00 +0900" endDate="2025-01-02 07:15:00 +0900" value="99"/>
+ <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="민준의 Apple Watch" unit="ms" startDate="2025-01-02 07:20:00 +0900" endDate="2025-01-02 07:21:00 +0900" value="45">
+  <HeartRateVariabilityMetadataList><InstantaneousBeatsPerMinute bpm="140" time="7:20:01.00 AM"/></HeartRateVariabilityMetadataList>
+ </Record>
+ <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="민준의 Apple Watch" unit="count/min" startDate="2025-01-02 00:00:00 +0900" endDate="2025-01-02 23:59:00 +0900" value="58"/>
+ <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="건강" unit="kg" startDate="2025-01-03 08:00:00 +0900" endDate="2025-01-03 08:00:00 +0900" value="68.5"/>
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="민준의 Apple Watch" unit="count" startDate="2025-01-02 07:00:00 +0900" endDate="2025-01-02 07:05:00 +0900" value="600"/>
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="민준의 Apple Watch" startDate="2025-01-03 01:00:00 +0900" endDate="2025-01-03 02:00:00 +0900" value="HKCategoryValueSleepAnalysisAsleepDeep"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="민준의 Apple Watch" unit="count/min" startDate="2024-06-01 07:00:00 +0900" endDate="2024-06-01 07:00:00 +0900" value="80"/>
+ <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" durationUnit="min" sourceName="민준의 Apple Watch" sourceVersion="11.2" device="&lt;&lt;HKDevice: 0x0&gt;, name:Apple Watch, manufacturer:Apple Inc.&gt;" creationDate="2025-01-02 07:30:10 +0900" startDate="2025-01-02 07:00:00 +0900" endDate="2025-01-02 07:30:00 +0900">
+  <MetadataEntry key="HKIndoorWorkout" value="0"/>
+  <WorkoutEvent type="HKWorkoutEventTypeSegment" date="2025-01-02 07:00:00 +0900" duration="10" durationUnit="min"/>
+  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned" startDate="2025-01-02 07:00:00 +0900" endDate="2025-01-02 07:30:00 +0900" sum="250.5" unit="kcal"/>
+  <WorkoutStatistics type="HKQuantityTypeIdentifierDistanceWalkingRunning" startDate="2025-01-02 07:00:00 +0900" endDate="2025-01-02 07:30:00 +0900" sum="5.01" unit="km"/>
+  <WorkoutStatistics type="HKQuantityTypeIdentifierHeartRate" average="150" minimum="120" maximum="170" unit="count/min"/>
+  <WorkoutRoute sourceName="민준의 Apple Watch" startDate="2025-01-02 07:00:00 +0900" endDate="2025-01-02 07:30:00 +0900">
+   <MetadataEntry key="HKMetadataKeySyncVersion" value="2"/>
+   <FileReference path="/workout-routes/route_2025-01-02_7.00am.gpx"/>
+  </WorkoutRoute>
+ </Workout>
+ <Workout workoutActivityType="HKWorkoutActivityTypeWalking" duration="40" durationUnit="min" totalDistance="3.2" totalDistanceUnit="mi" totalEnergyBurned="180" totalEnergyBurnedUnit="kcal" sourceName="민준의 Apple Watch" device="&lt;&lt;HKDevice: 0x0&gt;, name:Apple Watch&gt;" startDate="2025-01-03 18:00:00 +0900" endDate="2025-01-03 18:40:00 +0900"/>
+ <Workout workoutActivityType="HKWorkoutActivityTypeWalking" sourceName="민준의 iPhone" startDate="2025-01-04 09:00:00 +0900" endDate="2025-01-04 09:20:00 +0900"/>
+ <Workout workoutActivityType="HKWorkoutActivityTypeTraditionalStrengthTraining" sourceName="민준의 Apple Watch" startDate="2025-01-05 20:00:00 +0900" endDate="2025-01-05 20:45:00 +0900">
+  <MetadataEntry key="HKIndoorWorkout" value="1"/>
+ </Workout>
+ <Workout workoutActivityType="HKWorkoutActivityTypeCycling" sourceName="민준의 Apple Watch" startDate="2025-01-06 20:00:00 +0900" endDate="2025-01-06 20:30:00 +0900">
+  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned" sum="1000" unit="kJ"/>
+ </Workout>
+ <ActivitySummary dateComponents="2025-01-02" activeEnergyBurned="400"/>
+</HealthData>
