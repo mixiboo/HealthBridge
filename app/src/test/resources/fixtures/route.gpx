@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Apple Health Export" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <metadata><time>2025-01-01T22:30:00Z</time></metadata>
+ <trk><name>Route 2025-01-02 7:00am</name><trkseg>
+  <trkpt lon="128.8894" lat="35.2285"><ele>12.3</ele><time>2025-01-01T22:00:05Z</time><extensions><speed>2.8</speed><course>10.0</course><hAcc>3.0</hAcc><vAcc>2.0</vAcc></extensions></trkpt>
+  <trkpt lon="128.8895" lat="35.2290"><ele>12.8</ele></trkpt>
+  <trkpt lon="128.8897" lat="35.2296"><time>2025-01-01T22:00:15Z</time></trkpt>
+ </trkseg></trk>
+</gpx>
