@@ -1,8 +1,22 @@
 package com.minjun.healthbridge.apple
 
+import com.minjun.healthbridge.model.AppleTime
 import com.minjun.healthbridge.model.AppleWorkout
+import com.minjun.healthbridge.model.HeartSample
+import com.minjun.healthbridge.model.ImportOptions
+import com.minjun.healthbridge.model.QuantitySample
+import com.minjun.healthbridge.model.SleepSample
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
+import kotlin.math.roundToLong
+
+/** 기록 회차에서 찾은 데이터를 받는 곳 */
+interface RecordSink {
+    fun onWorkoutHeart(workout: AppleWorkout, sample: HeartSample)
+    fun onAllDayHeart(sample: HeartSample)
+    fun onQuantity(sample: QuantitySample)
+    fun onSleep(sample: SleepSample)
+}
 
 /**
  * 애플 건강 export.xml 스트리밍 파서. 파일 전체를 메모리에 올리지 않고 요소를 하나씩 읽는다.
@@ -26,6 +40,76 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
             event = p.next()
         }
         return out
+    }
+
+    /** 2회차: Record 요소를 스트리밍하며 운동 구간 심박과 선택 항목을 sink로 보낸다. HRV는 절대 보내지 않는다. */
+    fun readRecords(input: InputStream, options: ImportOptions, workouts: List<AppleWorkout>, sink: RecordSink) {
+        val sorted = workouts.sortedBy { it.start.instant }
+        val starts = sorted.map { it.start.instant.toEpochMilli() }.toLongArray()
+        fun workoutAt(t: AppleTime): AppleWorkout? {
+            val ms = t.instant.toEpochMilli()
+            var i = java.util.Arrays.binarySearch(starts, ms)
+            if (i < 0) i = -i - 2
+            // 겹치는 운동이 있을 수 있어 몇 개 앞까지 확인
+            var k = i
+            while (k >= 0 && k > i - 4) {
+                val w = sorted[k]
+                if (ms <= w.end.instant.toEpochMilli()) return w
+                k--
+            }
+            return null
+        }
+
+        val p = open(input)
+        var event = p.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            if (event == XmlPullParser.START_TAG && p.depth == 2) {
+                if (p.name == "Record") handleRecord(p, options, ::workoutAt, sink)
+                skip(p)
+            }
+            event = p.next()
+        }
+    }
+
+    private fun handleRecord(
+        p: XmlPullParser,
+        options: ImportOptions,
+        workoutAt: (AppleTime) -> AppleWorkout?,
+        sink: RecordSink,
+    ) {
+        val type = p.attr("type") ?: return
+        val wanted = when (type) {
+            HEART_RATE -> options.workoutHeartRate || options.allDayHeartRate
+            RESTING_HR, BODY_MASS -> options.restingHrAndWeight
+            STEP_COUNT, SLEEP -> options.stepsAndSleep
+            else -> false
+        }
+        if (!wanted) return
+        val source = p.attr("sourceName")
+        val fromWatch = isWatch(source, p.attr("device"))
+        if (options.watchOnly && !fromWatch && type != BODY_MASS) return
+        val start = p.attr("startDate")?.let(AppleDates::parse) ?: return
+        val end = p.attr("endDate")?.let(AppleDates::parse) ?: return
+        if (options.from != null && end.instant < options.from) return
+        if (options.to != null && start.instant > options.to) return
+        val value = p.attr("value") ?: return
+
+        when (type) {
+            HEART_RATE -> {
+                val bpm = value.toDoubleOrNull()?.roundToLong() ?: return
+                val sample = HeartSample(start, bpm)
+                val w = if (options.workoutHeartRate) workoutAt(start) else null
+                when {
+                    w != null -> sink.onWorkoutHeart(w, sample)
+                    options.allDayHeartRate -> sink.onAllDayHeart(sample)
+                }
+            }
+            SLEEP -> sink.onSleep(SleepSample(start, end, value, fromWatch))
+            else -> {
+                val v = value.toDoubleOrNull() ?: return
+                sink.onQuantity(QuantitySample(type, start, end, v, p.attr("unit") ?: "", fromWatch))
+            }
+        }
     }
 
     internal fun open(input: InputStream): XmlPullParser = parserFactory().apply {
@@ -80,6 +164,12 @@ class HealthXmlParser(private val parserFactory: () -> XmlPullParser) {
     }
 
     internal companion object {
+        const val HEART_RATE = "HKQuantityTypeIdentifierHeartRate"
+        const val RESTING_HR = "HKQuantityTypeIdentifierRestingHeartRate"
+        const val BODY_MASS = "HKQuantityTypeIdentifierBodyMass"
+        const val STEP_COUNT = "HKQuantityTypeIdentifierStepCount"
+        const val SLEEP = "HKCategoryTypeIdentifierSleepAnalysis"
+
         fun XmlPullParser.attr(name: String): String? = getAttributeValue(null, name)
 
         fun isWatch(sourceName: String?, device: String?): Boolean =
